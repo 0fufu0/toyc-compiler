@@ -131,6 +131,17 @@ class IrVisitor implements AstVisitor<IrList> { ... }
 3. **错误处理**：采用 Fail-fast，语义错误直接 `throw new SemanticException(...)`，不做错误恢复。
 4. **桩模块**：下游可先用 Stub 推进开发，不阻塞等待上游完成。
 
+## 当前进度
+
+| 模块 | 状态 |
+|------|------|
+| Maven 工程与 ANTLR 插件 | ✅ 已完成 |
+| ToyC.g4 文法 | ✅ 已完成 |
+| AST 节点 + `AstVisitor` | ✅ 已完成 |
+| `ToyCFrontend.parse()` | 🚧 桩实现（第 2 天完成 AST 构建） |
+| 语义分析 | ⬜ 待成员 B 实现 |
+| IR 生成 | ⬜ 待成员 C 实现 |
+| 汇编生成与集成 | ⬜ 待成员 D 实现 |
 
 ## 相关文档
 
