@@ -140,7 +140,7 @@ class IrVisitor implements AstVisitor<IrList> { ... }
 | AST 节点 + `AstVisitor` | ✅ 已完成 |
 | `ToyCFrontend.parse()` | 🚧 桩实现（第 2 天完成 AST 构建） |
 | 语义分析 | ⬜ 待成员 B 实现 |
-| IR 生成 | ⬜ 待成员 C 实现 |
+| IR 生成 | ✅ 模块 C 已实现（IrInst / IrList / IrGenerator，含单元测试） |
 | 汇编生成与集成 | ⬜ 待成员 D 实现 |
 
 ## 相关文档
