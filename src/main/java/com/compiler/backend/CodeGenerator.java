@@ -1,73 +1,236 @@
 package com.compiler.backend;
 
-import java.util.Stack;
+import java.util.*;
 import com.compiler.ir.*;
 
 public class CodeGenerator {
+
     StringBuilder out = new StringBuilder();
 
-    Stack<String> breakLabels = new Stack<>();
-    Stack<String> continueLabels = new Stack<>();
+    Map<String, Integer> offsetMap;
+    int stackSize;
+    Context ctx;
 
-    int labelId = 0;
+    List<IrInst> currentFunctionIR;
 
-    String newLabel() {
-        return "L" + (labelId++);
+    boolean collecting = false;
+
+    static class Context {
+        Map<String, Integer> offsetMap = new HashMap<>();
+        int offset = 0;
+    }
+
+    // =========================
+    // ENTRY
+    // =========================
+    public String generate(IrList irList) {
+
+        List<IrInst> insts = irList.asList();
+
+        for (IrInst inst : insts) {
+            dispatch(inst);
+        }
+
+        return out.toString();
+    }
+
+    // =========================
+    // DISPATCH
+    // =========================
+    void dispatch(IrInst inst) {
+
+        switch (inst.op) {
+
+            case "FUNC" -> startFunc(inst);
+
+            case "ENDFUNC" -> endFunc();
+
+            default -> {
+                if (collecting) {
+                    currentFunctionIR.add(inst);
+                } else {
+                    // global scope (暂时忽略)
+                }
+            }
+        }
+    }
+
+    // =========================
+    // FUNC START
+    // =========================
+    void startFunc(IrInst inst) {
+
+        ctx = new Context();
+        offsetMap = ctx.offsetMap;
+
+        currentFunctionIR = new ArrayList<>();
+        collecting = true;
+
+        emit(inst.dst + ":");
+    }
+
+    // =========================
+    // FUNC END
+    // =========================
+    void endFunc() {
+
+        collecting = false;
+
+        prepare(currentFunctionIR);
+
+        emit("addi sp, sp, -" + stackSize);
+
+        for (IrInst i : currentFunctionIR) {
+            generateInst(i);
+        }
+
+    }
+
+    // =========================
+    // IR GENERATION
+    // =========================
+    void generateInst(IrInst i) {
+
+        switch (i.op) {
+
+            case "CONST" -> genConst(i);
+            case "ASSIGN" -> genAssign(i);
+
+            case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV" -> genBinary(i);
+
+            case "LABEL" -> emit(i.dst + ":");
+            case "GOTO" -> emit("j " + i.dst);
+
+            case "IFZ" -> genIfz(i);
+            case "IFNZ" -> genIfnz(i);
+
+            case "CALL" -> genCall(i);
+            case "RET" -> genRet(i);
+        }
+    }
+
+    // =========================
+    // PREPARE
+    // =========================
+    void prepare(List<IrInst> insts) {
+
+        ctx.offsetMap.clear();
+        ctx.offset = 0;
+
+        for (IrInst inst : insts) {
+
+            switch (inst.op) {
+
+                case "CONST", "ASSIGN" -> {
+                    alloc(inst.dst);
+                    if (isVariable(inst.a)) alloc(inst.a);
+                }
+
+                case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV" -> {
+                    alloc(inst.dst);
+                    alloc(inst.a);
+                    alloc(inst.b);
+                }
+
+                case "IFZ", "IFNZ" -> alloc(inst.a);
+
+                case "RET" -> {
+                    if (isVariable(inst.a)) alloc(inst.a);
+                }
+
+                default -> {}
+            }
+        }
+
+        stackSize = (-ctx.offset + 15) / 16 * 16; // 16-byte align（关键）
+    }
+
+    // =========================
+    // ALLOC
+    // =========================
+    void alloc(String var) {
+        if (var == null) return;
+
+        if (!ctx.offsetMap.containsKey(var)) {
+            ctx.offset -= 4;
+            ctx.offsetMap.put(var, ctx.offset);
+        }
+    }
+
+    boolean isVariable(String x) {
+        return x != null && !x.matches("-?\\d+");
+    }
+
+    // =========================
+    // LOAD / STORE
+    // =========================
+    void load(String var, String reg) {
+        if (isVariable(var)) {
+            emit("lw " + reg + ", " + ctx.offsetMap.get(var) + "(sp)");
+        } else {
+            emit("li " + reg + ", " + var);
+        }
+    }
+
+    void store(String reg, String var) {
+        alloc(var);
+        emit("sw " + reg + ", " + ctx.offsetMap.get(var) + "(sp)");
+    }
+
+    // =========================
+    // OPS
+    // =========================
+    void genConst(IrInst i) {
+        load(i.a, "t0");
+        store("t0", i.dst);
+    }
+
+    void genAssign(IrInst i) {
+        load(i.a, "t0");
+        store("t0", i.dst);
+    }
+
+    void genBinary(IrInst i) {
+
+        load(i.a, "t0");
+        load(i.b, "t1");
+
+        switch (i.op) {
+            case "BIN_ADD" -> emit("add t2, t0, t1");
+            case "BIN_SUB" -> emit("sub t2, t0, t1");
+            case "BIN_MUL" -> emit("mul t2, t0, t1");
+            case "BIN_DIV" -> emit("div t2, t0, t1");
+        }
+
+        store("t2", i.dst);
+    }
+
+    void genIfz(IrInst i) {
+        load(i.a, "t0");
+        emit("beqz t0, " + i.dst);
+    }
+
+    void genIfnz(IrInst i) {
+        load(i.a, "t0");
+        emit("bnez t0, " + i.dst);
+    }
+
+    void genCall(IrInst i) {
+        emit("call " + i.a);
+        store("a0", i.dst);
+    }
+
+    void genRet(IrInst i) {
+
+        if (i.a != null) {
+            load(i.a, "a0");
+        }
+
+        emit("addi sp, sp, " + stackSize);
+        emit("ret");
     }
 
     void emit(String s) {
         out.append(s).append("\n");
-    }
-
-    void emitLi(String reg, int imm) {
-        emit("li " + reg + ", " + imm);
-    }
-
-    void emitMv(String dst, String src) {
-        emit("mv " + dst + ", " + src);
-    }
-
-    void emitAdd(String dst, String a, String b) {
-        emit("add " + dst + ", " + a + ", " + b);
-    }
-
-    void emitSub(String dst, String a, String b) {
-        emit("sub " + dst + ", " + a + ", " + b);
-    }
-
-    void emitMul(String dst, String a, String b) {
-        emit("mul " + dst + ", " + a + ", " + b);
-    }
-
-    void emitDiv(String dst, String a, String b) {
-        emit("div " + dst + ", " + a + ", " + b);
-    }
-
-    void emitLw(String dst, int offset, String base) {
-        emit("lw " + dst + ", " + offset + "(" + base + ")");
-    }
-
-    void emitSw(String src, int offset, String base) {
-        emit("sw " + src + ", " + offset + "(" + base + ")");
-    }
-
-    void emitJ(String label) {
-        emit("j " + label);
-    }
-
-    void emitBeqz(String reg, String label) {
-        emit("beqz " + reg + ", " + label);
-    }
-
-    void emitBnez(String reg, String label) {
-        emit("bnez " + reg + ", " + label);
-    }
-
-    void emitCall(String func) {
-        emit("call " + func);
-    }
-
-    void emitRet() {
-        emit("ret");
     }
 }
