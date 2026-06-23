@@ -6,53 +6,58 @@ import java.util.Stack;
 
 public class SymbolTable {
 
-    // 作用域堆疊，完美契合你的 lowerCamelCase 命名習慣
+    // 作用域栈：每一层 Map 表示一个作用域
     private final Stack<Map<String, Symbol>> scopeStack;
 
     public SymbolTable() {
         this.scopeStack = new Stack<>();
-        // 系統啟動時，預設進入全域作用域
+
+        // 默认进入全局作用域
         this.enterScope();
     }
 
-    // 進入新的作用域 (遇到 '{' 時呼叫)
+    // 进入新的作用域
     public void enterScope() {
         this.scopeStack.push(new HashMap<>());
     }
 
-    // 離開當前作用域 (遇到 '}' 時呼叫)
+    // 离开当前作用域
     public void exitScope() {
+        // 保留最外层全局作用域，避免整个符号表被清空
         if (this.scopeStack.size() > 1) {
             this.scopeStack.pop();
         }
     }
 
-    // 將新符號加入當前作用域
-    // 回傳 boolean 代表是否加入成功 (用來檢查變數是否重複宣告)
+    // 将新符号加入当前作用域
+    // 返回 false 表示当前作用域中已经有同名符号
     public boolean putSymbol(Symbol newSymbol) {
         Map<String, Symbol> currentScope = this.scopeStack.peek();
 
-        // 如果當前作用域已經有同名變數，回傳 false 報錯
-        if (currentScope.containsKey(newSymbol.symbolName)) {
+        if (currentScope.containsKey(newSymbol.name)) {
             return false;
         }
 
-        currentScope.put(newSymbol.symbolName, newSymbol);
+        currentScope.put(newSymbol.name, newSymbol);
         return true;
     }
 
-    // 查找符號 (由內層作用域向外層全域查找)
-    // 就像你匹配候選人一樣，逐層遍歷尋找符合條件的結果
+    // 查找符号：从内层作用域向外层作用域查找
     public Symbol lookupSymbol(String targetName) {
         for (int i = this.scopeStack.size() - 1; i >= 0; i--) {
             Map<String, Symbol> scope = this.scopeStack.get(i);
+
             if (scope.containsKey(targetName)) {
                 return scope.get(targetName);
             }
         }
-        // 如果所有層級都找不到，回傳 null，代表使用了未宣告的變數
+
         return null;
     }
+
+    // 判断当前作用域是否已经存在某个符号
+    public boolean existsInCurrentScope(String name) {
+        Map<String, Symbol> currentScope = this.scopeStack.peek();
+        return currentScope.containsKey(name);
+    }
 }
-
-

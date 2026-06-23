@@ -7,7 +7,7 @@ import com.compiler.ast.ValueType;
 
 /**
  * 符号种类。
- * ToyC 里没有 class，所以不要保留 CLASS。
+ * ToyC 里没有 class，所以不保留 CLASS。
  */
 enum SymbolType {
     VARIABLE,   // 普通变量
@@ -16,66 +16,40 @@ enum SymbolType {
     PARAMETER   // 函数形参
 }
 
-/**
- * 兼容旧代码用。
- * 后续建议统一使用 com.compiler.ast.ValueType。
- */
-enum Type {
-    INT,
-    VOID
-}
-
 public class Symbol {
 
-    // ===== 推荐以后主要使用这些字段 =====
     public String name;          // 符号名
     public ValueType type;       // 变量/常量/参数：int；函数：返回类型 int/void
+
+    public SymbolType symbolType;
+
     public boolean isConst;      // 是否为 const 常量
     public boolean isGlobal;     // 是否为全局符号
     public Integer constValue;   // 常量的编译期值，非 const 时为 null
 
-    // ===== 符号分类 =====
-    public SymbolType symbolType;
-
-    // ===== 兼容你原来那份代码的字段 =====
-    public String symbolName;
-    public Type dataType;
-
-    // ===== 函数专用：参数类型列表 =====
+    // 函数专用：参数类型列表
     public List<ValueType> paramTypes;
 
     /**
-     * 占位构造器：保留 HEAD 版本的用法。
+     * 占位构造器：给 AST 节点的 symbolRef 等地方使用。
      */
     public Symbol(String name) {
         this(name, SymbolType.VARIABLE, ValueType.INT);
     }
 
     /**
-     * 推荐使用的构造器。
+     * 通用构造器。
      */
     public Symbol(String name, SymbolType symbolType, ValueType type) {
         this.name = name;
-        this.symbolName = name;
-
         this.symbolType = symbolType;
-
         this.type = type;
-        this.dataType = toLegacyType(type);
 
         this.isConst = symbolType == SymbolType.CONSTANT;
         this.isGlobal = false;
         this.constValue = null;
 
         this.paramTypes = new ArrayList<>();
-    }
-
-    /**
-     * 兼容旧代码的构造器：
-     * new Symbol(name, SymbolType.VARIABLE, Type.INT)
-     */
-    public Symbol(String symbolName, SymbolType symbolType, Type dataType) {
-        this(symbolName, symbolType, toValueType(dataType));
     }
 
     /**
@@ -117,19 +91,5 @@ public class Symbol {
         }
 
         return symbol;
-    }
-
-    private static ValueType toValueType(Type type) {
-        if (type == Type.VOID) {
-            return ValueType.VOID;
-        }
-        return ValueType.INT;
-    }
-
-    private static Type toLegacyType(ValueType type) {
-        if (type == ValueType.VOID) {
-            return Type.VOID;
-        }
-        return Type.INT;
     }
 }
