@@ -1,7 +1,7 @@
 package com.compiler.backend;
 
 import java.util.Stack;
-import com.compiler.ir.*;
+//import com.compiler.ir.*;
 
 public class CodeGenerator {
     StringBuilder out = new StringBuilder();
