@@ -74,8 +74,12 @@ public class CodeGenerator {
         if (!textEmitted) {
             emit(".text");
             textEmitted = true;
+            emit(".globl _start");
+            emit("_start:");
+            emit("call main");
+            emit("li a7, 10");
+            emit("ecall");
         }
-        emit(".globl " + inst.dst);
         emit(inst.dst + ":");
     }
 
@@ -202,11 +206,9 @@ public class CodeGenerator {
 
     void emitPrologue() {
         emit("addi sp, sp, -" + stackSize);
-        emit("sw ra, " + raOffset + "(sp)");
     }
 
     void emitEpilogue() {
-        emit("lw ra, " + raOffset + "(sp)");
         emit("addi sp, sp, " + stackSize);
         emit("ret");
     }
@@ -250,7 +252,9 @@ public class CodeGenerator {
     }
 
     void genCall(IrInst i) {
+        emit("sw ra, " + raOffset + "(sp)");
         emit("call " + i.a);
+        emit("lw ra, " + raOffset + "(sp)");
         store("a0", i.dst);
     }
 
