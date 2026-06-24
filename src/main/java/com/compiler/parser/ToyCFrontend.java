@@ -18,18 +18,19 @@ public final class ToyCFrontend {
      *
      * @param source 完整源码字符串
      * @return AST 根节点
-     * @throws ParseException 词法或语法错误
+     * @throws ParseException 词法或语法错误（含行列号）
      */
     public static CompUnitNode parse(String source) {
         var lexer = new ToyCLexer(CharStreams.fromString(source));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(ThrowingErrorListener.INSTANCE);
+
         var tokens = new CommonTokenStream(lexer);
         var parser = new ToyCParser(tokens);
+        parser.removeErrorListeners();
+        parser.addErrorListener(ThrowingErrorListener.INSTANCE);
 
         var tree = parser.compUnit();
-        if (parser.getNumberOfSyntaxErrors() > 0) {
-            throw new ParseException("syntax error in ToyC source");
-        }
-
         AstNode result = new AstBuilder().visitCompUnit(tree);
         return (CompUnitNode) result;
     }

@@ -1,6 +1,7 @@
 package com.compiler.parser;
 
 import com.compiler.ast.*;
+import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 import java.util.ArrayList;
@@ -10,6 +11,14 @@ import java.util.List;
  * ANTLR ParseTree → 自定义 AST 的转换器。
  */
 public class AstBuilder extends ToyCBaseVisitor<AstNode> {
+
+    private static <T extends AstNode> T withPos(T node, ParserRuleContext ctx) {
+        if (ctx != null && ctx.start != null) {
+            node.line = ctx.start.getLine();
+            node.column = ctx.start.getCharPositionInLine() + 1;
+        }
+        return node;
+    }
 
     @Override
     public AstNode visitCompUnit(ToyCParser.CompUnitContext ctx) {
@@ -22,7 +31,7 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
                 items.add(visitFuncDef(funcCtx));
             }
         }
-        return new CompUnitNode(items);
+        return withPos(new CompUnitNode(items), ctx);
     }
 
     @Override
@@ -37,14 +46,14 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
     public AstNode visitConstDecl(ToyCParser.ConstDeclContext ctx) {
         String name = ctx.ID().getText();
         ExprNode init = (ExprNode) visit(ctx.expr());
-        return new ConstDeclNode(name, init);
+        return withPos(new ConstDeclNode(name, init), ctx);
     }
 
     @Override
     public AstNode visitVarDecl(ToyCParser.VarDeclContext ctx) {
         String name = ctx.ID().getText();
         ExprNode init = (ExprNode) visit(ctx.expr());
-        return new VarDeclNode(name, init);
+        return withPos(new VarDeclNode(name, init), ctx);
     }
 
     @Override
@@ -56,22 +65,22 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
             ExprNode cond = (ExprNode) visit(ctx.expr());
             StmtNode thenBranch = (StmtNode) visit(ctx.stmt(0));
             StmtNode elseBranch = ctx.ELSE() != null ? (StmtNode) visit(ctx.stmt(1)) : null;
-            return new IfStmtNode(cond, thenBranch, elseBranch);
+            return withPos(new IfStmtNode(cond, thenBranch, elseBranch), ctx);
         }
         if (ctx.WHILE() != null) {
             ExprNode cond = (ExprNode) visit(ctx.expr());
             StmtNode body = (StmtNode) visit(ctx.stmt(0));
-            return new WhileStmtNode(cond, body);
+            return withPos(new WhileStmtNode(cond, body), ctx);
         }
         if (ctx.BREAK() != null) {
-            return new BreakStmtNode();
+            return withPos(new BreakStmtNode(), ctx);
         }
         if (ctx.CONTINUE() != null) {
-            return new ContinueStmtNode();
+            return withPos(new ContinueStmtNode(), ctx);
         }
         if (ctx.RETURN() != null) {
             ExprNode value = ctx.expr() != null ? (ExprNode) visit(ctx.expr()) : null;
-            return new ReturnStmtNode(value);
+            return withPos(new ReturnStmtNode(value), ctx);
         }
         if (ctx.decl() != null) {
             return visitDecl(ctx.decl());
@@ -79,12 +88,12 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
         if (ctx.ID() != null && ctx.ASSIGN() != null) {
             String name = ctx.ID().getText();
             ExprNode value = (ExprNode) visit(ctx.expr());
-            return new AssignStmtNode(name, value);
+            return withPos(new AssignStmtNode(name, value), ctx);
         }
         if (ctx.expr() != null) {
-            return new ExprStmtNode((ExprNode) visit(ctx.expr()));
+            return withPos(new ExprStmtNode((ExprNode) visit(ctx.expr())), ctx);
         }
-        return new EmptyStmtNode();
+        return withPos(new EmptyStmtNode(), ctx);
     }
 
     @Override
@@ -93,7 +102,7 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
         for (ToyCParser.StmtContext stmtCtx : ctx.stmt()) {
             stmts.add(visitStmt(stmtCtx));
         }
-        return new BlockStmtNode(stmts);
+        return withPos(new BlockStmtNode(stmts), ctx);
     }
 
     @Override
@@ -107,12 +116,12 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
             }
         }
         BlockStmtNode body = (BlockStmtNode) visitBlock(ctx.block());
-        return new FuncDefNode(returnType, name, params, body);
+        return withPos(new FuncDefNode(returnType, name, params, body), ctx);
     }
 
     @Override
     public AstNode visitParam(ToyCParser.ParamContext ctx) {
-        return new ParamNode(ctx.ID().getText());
+        return withPos(new ParamNode(ctx.ID().getText()), ctx);
     }
 
     @Override
@@ -125,7 +134,7 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
         if (ctx.lOrExpr() != null) {
             ExprNode left = (ExprNode) visit(ctx.lOrExpr());
             ExprNode right = (ExprNode) visit(ctx.lAndExpr());
-            return new BinaryExprNode(BinOp.OR, left, right);
+            return withPos(new BinaryExprNode(BinOp.OR, left, right), ctx);
         }
         return visit(ctx.lAndExpr());
     }
@@ -135,7 +144,7 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
         if (ctx.lAndExpr() != null) {
             ExprNode left = (ExprNode) visit(ctx.lAndExpr());
             ExprNode right = (ExprNode) visit(ctx.relExpr());
-            return new BinaryExprNode(BinOp.AND, left, right);
+            return withPos(new BinaryExprNode(BinOp.AND, left, right), ctx);
         }
         return visit(ctx.relExpr());
     }
@@ -146,7 +155,7 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
             ExprNode left = (ExprNode) visit(ctx.relExpr());
             ExprNode right = (ExprNode) visit(ctx.addExpr());
             BinOp op = relOp(ctx);
-            return new BinaryExprNode(op, left, right);
+            return withPos(new BinaryExprNode(op, left, right), ctx);
         }
         return visit(ctx.addExpr());
     }
@@ -157,7 +166,7 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
             ExprNode left = (ExprNode) visit(ctx.addExpr());
             ExprNode right = (ExprNode) visit(ctx.mulExpr());
             BinOp op = ctx.PLUS() != null ? BinOp.ADD : BinOp.SUB;
-            return new BinaryExprNode(op, left, right);
+            return withPos(new BinaryExprNode(op, left, right), ctx);
         }
         return visit(ctx.mulExpr());
     }
@@ -175,7 +184,7 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
             } else {
                 op = BinOp.MOD;
             }
-            return new BinaryExprNode(op, left, right);
+            return withPos(new BinaryExprNode(op, left, right), ctx);
         }
         return visit(ctx.unaryExpr());
     }
@@ -192,7 +201,7 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
                 op = UnaryOp.NOT;
             }
             ExprNode operand = (ExprNode) visit(ctx.unaryExpr());
-            return new UnaryExprNode(op, operand);
+            return withPos(new UnaryExprNode(op, operand), ctx);
         }
         return visit(ctx.primaryExpr());
     }
@@ -200,7 +209,7 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
     @Override
     public AstNode visitPrimaryExpr(ToyCParser.PrimaryExprContext ctx) {
         if (ctx.NUMBER() != null) {
-            return new IntLiteralNode(Integer.parseInt(ctx.NUMBER().getText()));
+            return withPos(new IntLiteralNode(Integer.parseInt(ctx.NUMBER().getText())), ctx);
         }
         if (ctx.expr() != null) {
             return visit(ctx.expr());
@@ -213,9 +222,9 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
                     args.add((ExprNode) visit(argCtx));
                 }
             }
-            return new CallExprNode(name, args);
+            return withPos(new CallExprNode(name, args), ctx);
         }
-        return new IdNode(name);
+        return withPos(new IdNode(name), ctx);
     }
 
     private static BinOp relOp(ToyCParser.RelExprContext ctx) {

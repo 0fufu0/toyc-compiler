@@ -1,0 +1,11 @@
+const int N = 10;
+int acc = 0;
+
+int main() {
+    int i = 0;
+    while (i < N) {
+        acc = acc + i;
+        i = i + 1;
+    }
+    return acc;
+}

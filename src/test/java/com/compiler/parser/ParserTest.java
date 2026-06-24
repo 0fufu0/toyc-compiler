@@ -119,4 +119,25 @@ class ParserTest {
         assertTrue(dump.contains("FuncDef(add"));
         assertTrue(dump.contains("Call(add"));
     }
+
+    @Test
+    void astNodesHaveSourcePositions() {
+        String source = "int main() { return 1 + 2; }";
+        CompUnitNode ast = ToyCFrontend.parse(source);
+        FuncDefNode main = (FuncDefNode) ast.items.get(0);
+
+        assertTrue(main.line > 0);
+        assertTrue(main.column > 0);
+        assertTrue(main.body.line > 0);
+    }
+
+    @Test
+    void syntaxErrorReportsLineAndColumn() {
+        String source = "int main() { return 1 + ; }";
+
+        ParseException ex = assertThrows(ParseException.class, () -> ToyCFrontend.parse(source));
+        assertTrue(ex.line > 0, "expected line > 0, got: " + ex.getMessage());
+        assertTrue(ex.column > 0, "expected column > 0, got: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains(":"));
+    }
 }

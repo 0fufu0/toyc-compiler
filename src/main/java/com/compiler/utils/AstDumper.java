@@ -19,6 +19,11 @@ public final class AstDumper implements AstVisitor<Void> {
         return dumper.out.toString().trim();
     }
 
+    private void line(AstNode node, String text) {
+        String pos = node.line > 0 ? " @" + node.line + ":" + node.column : "";
+        out.append("  ".repeat(indent)).append(text).append(pos).append('\n');
+    }
+
     private void line(String text) {
         out.append("  ".repeat(indent)).append(text).append('\n');
     }
@@ -31,7 +36,7 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitCompUnit(CompUnitNode node) {
-        line("CompUnit");
+        line(node, "CompUnit");
         indent++;
         visitChildren(node.items);
         indent--;
@@ -40,7 +45,7 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitConstDecl(ConstDeclNode node) {
-        line("ConstDecl(" + node.name + ")");
+        line(node, "ConstDecl(" + node.name + ")");
         indent++;
         node.init.accept(this);
         indent--;
@@ -49,7 +54,7 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitVarDecl(VarDeclNode node) {
-        line("VarDecl(" + node.name + ")");
+        line(node, "VarDecl(" + node.name + ")");
         indent++;
         node.init.accept(this);
         indent--;
@@ -58,7 +63,7 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitBlockStmt(BlockStmtNode node) {
-        line("Block");
+        line(node, "Block");
         indent++;
         visitChildren(node.stmts);
         indent--;
@@ -67,13 +72,13 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitEmptyStmt(EmptyStmtNode node) {
-        line("EmptyStmt");
+        line(node, "EmptyStmt");
         return null;
     }
 
     @Override
     public Void visitExprStmt(ExprStmtNode node) {
-        line("ExprStmt");
+        line(node, "ExprStmt");
         indent++;
         node.expr.accept(this);
         indent--;
@@ -82,7 +87,7 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitAssignStmt(AssignStmtNode node) {
-        line("Assign(" + node.name + ")");
+        line(node, "Assign(" + node.name + ")");
         indent++;
         node.value.accept(this);
         indent--;
@@ -91,7 +96,7 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitIfStmt(IfStmtNode node) {
-        line("If");
+        line(node, "If");
         indent++;
         line("cond");
         indent++;
@@ -113,7 +118,7 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitWhileStmt(WhileStmtNode node) {
-        line("While");
+        line(node, "While");
         indent++;
         line("cond");
         indent++;
@@ -129,19 +134,19 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitBreakStmt(BreakStmtNode node) {
-        line("Break");
+        line(node, "Break");
         return null;
     }
 
     @Override
     public Void visitContinueStmt(ContinueStmtNode node) {
-        line("Continue");
+        line(node, "Continue");
         return null;
     }
 
     @Override
     public Void visitReturnStmt(ReturnStmtNode node) {
-        line("Return");
+        line(node, "Return");
         if (node.value != null) {
             indent++;
             node.value.accept(this);
@@ -152,7 +157,7 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitFuncDef(FuncDefNode node) {
-        line("FuncDef(" + node.name + ", " + node.returnType + ")");
+        line(node, "FuncDef(" + node.name + ", " + node.returnType + ")");
         indent++;
         for (ParamNode param : node.params) {
             param.accept(this);
@@ -164,13 +169,13 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitParam(ParamNode node) {
-        line("Param(" + node.name + ")");
+        line(node, "Param(" + node.name + ")");
         return null;
     }
 
     @Override
     public Void visitBinaryExpr(BinaryExprNode node) {
-        line("Binary(" + node.op + ")");
+        line(node, "Binary(" + node.op + ")");
         indent++;
         node.left.accept(this);
         node.right.accept(this);
@@ -180,7 +185,7 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitUnaryExpr(UnaryExprNode node) {
-        line("Unary(" + node.op + ")");
+        line(node, "Unary(" + node.op + ")");
         indent++;
         node.operand.accept(this);
         indent--;
@@ -189,19 +194,19 @@ public final class AstDumper implements AstVisitor<Void> {
 
     @Override
     public Void visitId(IdNode node) {
-        line("Id(" + node.name + ")");
+        line(node, "Id(" + node.name + ")");
         return null;
     }
 
     @Override
     public Void visitIntLiteral(IntLiteralNode node) {
-        line("Int(" + node.value + ")");
+        line(node, "Int(" + node.value + ")");
         return null;
     }
 
     @Override
     public Void visitCallExpr(CallExprNode node) {
-        line("Call(" + node.funcName + ")");
+        line(node, "Call(" + node.funcName + ")");
         indent++;
         visitChildren(node.args);
         indent--;
