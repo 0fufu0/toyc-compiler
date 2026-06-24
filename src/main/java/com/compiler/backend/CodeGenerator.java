@@ -14,6 +14,9 @@ public class CodeGenerator {
 
     List<IrInst> currentFunctionIR;
 
+    boolean dataEmitted = false;
+    Set<String> globalVars = new HashSet<>();
+
     boolean collecting = false;
     boolean textEmitted = false;
     int tempRegCounter = 0;
@@ -41,6 +44,8 @@ public class CodeGenerator {
     void dispatch(IrInst inst) {
 
         switch (inst.op) {
+
+            case "GLOBAL" -> genGlobal(inst);
 
             case "FUNC" -> startFunc(inst);
 
@@ -100,7 +105,7 @@ public class CodeGenerator {
             case "ASSIGN" -> genAssign(i);
 
             case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV","BIN_LT", "BIN_GT","BIN_LE","BIN_GE","BIN_EQ","BIN_NE","BIN_MOD"-> genBinary(i);
-
+            case "NEG", "NOT" -> genUnary(i);
             case "LABEL" -> emit(i.dst + ":");
             case "GOTO" -> emit("j " + i.dst);
 
@@ -109,7 +114,7 @@ public class CodeGenerator {
 
             case "CALL" -> genCall(i);
             case "RET" -> genRet(i);
-
+            default -> throw new RuntimeException("Unknown op: " + i.op);
         }
     }
 
@@ -132,7 +137,10 @@ public class CodeGenerator {
                     alloc(inst.a);
                     alloc(inst.b);
                 }
-
+                case "NEG", "NOT" -> {
+                    alloc(inst.dst);
+                    alloc(inst.a);
+                }
                 case "IFZ", "IFNZ" -> alloc(inst.a);
 
                 case "CALL" -> {
@@ -174,16 +182,38 @@ public class CodeGenerator {
     }
 
     void load(String var, String reg) {
-        if (isVariable(var)) {
-            emit("lw " + reg + ", " + ctx.offsetMap.get(var) + "(sp)");
-        } else {
+
+        if (!isVariable(var)) {
             emit("li " + reg + ", " + var);
+            return;
+        }
+
+        if (globalVars.contains(var)) {
+
+            emit("la t6, " + var);
+            emit("lw " + reg + ", 0(t6)");
+
+        } else {
+
+            emit("lw " + reg + ", " +
+                    offsetMap.get(var) + "(sp)");
         }
     }
 
     void store(String reg, String var) {
-        if (isVariable(var)) {
-            emit("sw " + reg + ", " + ctx.offsetMap.get(var) + "(sp)");
+
+        if (!isVariable(var))
+            return;
+
+        if (globalVars.contains(var)) {
+
+            emit("la t6, " + var);
+            emit("sw " + reg + ", 0(t6)");
+
+        } else {
+
+            emit("sw " + reg + ", " +
+                    offsetMap.get(var) + "(sp)");
         }
     }
 
@@ -204,6 +234,19 @@ public class CodeGenerator {
     void genAssign(IrInst i) {
         load(i.a, "t0");
         store("t0", i.dst);
+    }
+
+    void genGlobal(IrInst i) {
+
+        if (!dataEmitted) {
+            emit(".data");
+            dataEmitted = true;
+        }
+
+        emit(i.dst + ":");
+        emit(".word " + i.a);
+
+        globalVars.add(i.dst);
     }
 
     void genBinary(IrInst i) {
@@ -245,6 +288,28 @@ public class CodeGenerator {
             case "BIN_MOD" -> emit("rem t2, t0, t1");
 
             default -> throw new RuntimeException("Unknown op: " + i.op);
+        }
+
+        store("t2", i.dst);
+    }
+
+    void genUnary(IrInst i) {
+
+        load(i.a, "t0");   // 只有一个操作数
+
+        switch (i.op) {
+
+            case "NEG" -> {
+                // t2 = -t0
+                emit("sub t2, x0, t0");
+            }
+
+            case "NOT" -> {
+                // t2 = (t0 == 0)
+                emit("seqz t2, t0");
+            }
+
+            default -> throw new RuntimeException("Unknown unary op: " + i.op);
         }
 
         store("t2", i.dst);

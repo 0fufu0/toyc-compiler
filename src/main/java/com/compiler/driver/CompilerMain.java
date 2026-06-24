@@ -26,10 +26,10 @@ public class CompilerMain {
         //testIfElse();
 
         // 测试4: while循环
-        //testWhileLoop();
+        testWhileLoop();
 
         // 测试5: 函数调用
-        testFunctionCall();
+        //testFunctionCall();
 
         System.out.println("\n=== All Module Tests Passed ===");
     }
@@ -107,7 +107,7 @@ public class CompilerMain {
             new VarDeclNode("sum", new IntLiteralNode(0)),
             new VarDeclNode("i", new IntLiteralNode(1)),
             new WhileStmtNode(
-                new BinaryExprNode(BinOp.LE, new IdNode("i"), new IntLiteralNode(10)),
+                new BinaryExprNode(BinOp.LE, new IdNode("i"), new IntLiteralNode(3)),
                 loopBody
             ),
             new ReturnStmtNode(new IdNode("sum"))
