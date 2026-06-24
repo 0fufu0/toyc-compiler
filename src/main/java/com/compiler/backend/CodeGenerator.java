@@ -9,11 +9,13 @@ public class CodeGenerator {
 
     Map<String, Integer> offsetMap;
     int stackSize;
+    int raOffset;
     Context ctx;
 
     List<IrInst> currentFunctionIR;
 
     boolean collecting = false;
+    boolean textEmitted = false;
 
     static class Context {
         Map<String, Integer> offsetMap = new HashMap<>();
@@ -24,6 +26,9 @@ public class CodeGenerator {
     // ENTRY
     // =========================
     public String generate(IrList irList) {
+
+        out.setLength(0);
+        textEmitted = false;
 
         List<IrInst> insts = irList.asList();
 
@@ -66,6 +71,15 @@ public class CodeGenerator {
         currentFunctionIR = new ArrayList<>();
         collecting = true;
 
+        if (!textEmitted) {
+            emit(".text");
+            textEmitted = true;
+            emit(".globl _start");
+            emit("_start:");
+            emit("call main");
+            emit("li a7, 10");
+            emit("ecall");
+        }
         emit(inst.dst + ":");
     }
 
@@ -77,13 +91,15 @@ public class CodeGenerator {
         collecting = false;
 
         prepare(currentFunctionIR);
-
-        emit("addi sp, sp, -" + stackSize);
+        emitPrologue();
 
         for (IrInst i : currentFunctionIR) {
             generateInst(i);
         }
 
+        if (currentFunctionIR.isEmpty() || !"RET".equals(currentFunctionIR.get(currentFunctionIR.size() - 1).op)) {
+            emitEpilogue();
+        }
     }
 
     // =========================
@@ -134,6 +150,10 @@ public class CodeGenerator {
 
                 case "IFZ", "IFNZ" -> alloc(inst.a);
 
+                case "CALL" -> {
+                    if (isVariable(inst.dst)) alloc(inst.dst);
+                }
+
                 case "RET" -> {
                     if (isVariable(inst.a)) alloc(inst.a);
                 }
@@ -142,7 +162,13 @@ public class CodeGenerator {
             }
         }
 
+        allocRA();
         stackSize = (-ctx.offset + 15) / 16 * 16; // 16-byte align（关键）
+    }
+
+    void allocRA() {
+        ctx.offset -= 4;
+        raOffset = ctx.offset;
     }
 
     // =========================
@@ -173,8 +199,18 @@ public class CodeGenerator {
     }
 
     void store(String reg, String var) {
-        alloc(var);
-        emit("sw " + reg + ", " + ctx.offsetMap.get(var) + "(sp)");
+        if (isVariable(var)) {
+            emit("sw " + reg + ", " + ctx.offsetMap.get(var) + "(sp)");
+        }
+    }
+
+    void emitPrologue() {
+        emit("addi sp, sp, -" + stackSize);
+    }
+
+    void emitEpilogue() {
+        emit("addi sp, sp, " + stackSize);
+        emit("ret");
     }
 
     // =========================
@@ -216,7 +252,9 @@ public class CodeGenerator {
     }
 
     void genCall(IrInst i) {
+        emit("sw ra, " + raOffset + "(sp)");
         emit("call " + i.a);
+        emit("lw ra, " + raOffset + "(sp)");
         store("a0", i.dst);
     }
 

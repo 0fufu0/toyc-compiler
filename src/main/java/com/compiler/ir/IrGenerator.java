@@ -285,4 +285,8 @@ public class IrGenerator implements AstVisitor<IrList> {
         res.add(IrInst.call(dst, node.funcName));
         return res;
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> dev-d-backend
