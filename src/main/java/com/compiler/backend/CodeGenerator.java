@@ -16,15 +16,14 @@ public class CodeGenerator {
 
     boolean collecting = false;
     boolean textEmitted = false;
+    int tempRegCounter = 0;
+
 
     static class Context {
         Map<String, Integer> offsetMap = new HashMap<>();
         int offset = 0;
     }
 
-    // =========================
-    // ENTRY
-    // =========================
     public String generate(IrList irList) {
 
         out.setLength(0);
@@ -39,9 +38,6 @@ public class CodeGenerator {
         return out.toString();
     }
 
-    // =========================
-    // DISPATCH
-    // =========================
     void dispatch(IrInst inst) {
 
         switch (inst.op) {
@@ -60,9 +56,6 @@ public class CodeGenerator {
         }
     }
 
-    // =========================
-    // FUNC START
-    // =========================
     void startFunc(IrInst inst) {
 
         ctx = new Context();
@@ -83,9 +76,6 @@ public class CodeGenerator {
         emit(inst.dst + ":");
     }
 
-    // =========================
-    // FUNC END
-    // =========================
     void endFunc() {
 
         collecting = false;
@@ -102,9 +92,6 @@ public class CodeGenerator {
         }
     }
 
-    // =========================
-    // IR GENERATION
-    // =========================
     void generateInst(IrInst i) {
 
         switch (i.op) {
@@ -112,7 +99,7 @@ public class CodeGenerator {
             case "CONST" -> genConst(i);
             case "ASSIGN" -> genAssign(i);
 
-            case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV" -> genBinary(i);
+            case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV","BIN_LT", "BIN_GT","BIN_LE","BIN_GE","BIN_EQ","BIN_NE","BIN_MOD"-> genBinary(i);
 
             case "LABEL" -> emit(i.dst + ":");
             case "GOTO" -> emit("j " + i.dst);
@@ -122,12 +109,10 @@ public class CodeGenerator {
 
             case "CALL" -> genCall(i);
             case "RET" -> genRet(i);
+
         }
     }
 
-    // =========================
-    // PREPARE
-    // =========================
     void prepare(List<IrInst> insts) {
 
         ctx.offsetMap.clear();
@@ -142,7 +127,7 @@ public class CodeGenerator {
                     if (isVariable(inst.a)) alloc(inst.a);
                 }
 
-                case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV" -> {
+                case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV","BIN_LT", "BIN_GT","BIN_LE","BIN_GE","BIN_EQ","BIN_NE","BIN_MOD"-> {
                     alloc(inst.dst);
                     alloc(inst.a);
                     alloc(inst.b);
@@ -158,7 +143,7 @@ public class CodeGenerator {
                     if (isVariable(inst.a)) alloc(inst.a);
                 }
 
-                default -> {}
+
             }
         }
 
@@ -166,14 +151,15 @@ public class CodeGenerator {
         stackSize = (-ctx.offset + 15) / 16 * 16; // 16-byte align（关键）
     }
 
+    String allocTemp() {
+        return "t" + (tempRegCounter++ % 7); // t0-t6循环
+    }
+
     void allocRA() {
         ctx.offset -= 4;
         raOffset = ctx.offset;
     }
 
-    // =========================
-    // ALLOC
-    // =========================
     void alloc(String var) {
         if (var == null) return;
 
@@ -187,9 +173,6 @@ public class CodeGenerator {
         return x != null && !x.matches("-?\\d+");
     }
 
-    // =========================
-    // LOAD / STORE
-    // =========================
     void load(String var, String reg) {
         if (isVariable(var)) {
             emit("lw " + reg + ", " + ctx.offsetMap.get(var) + "(sp)");
@@ -213,9 +196,6 @@ public class CodeGenerator {
         emit("ret");
     }
 
-    // =========================
-    // OPS
-    // =========================
     void genConst(IrInst i) {
         load(i.a, "t0");
         store("t0", i.dst);
@@ -236,6 +216,35 @@ public class CodeGenerator {
             case "BIN_SUB" -> emit("sub t2, t0, t1");
             case "BIN_MUL" -> emit("mul t2, t0, t1");
             case "BIN_DIV" -> emit("div t2, t0, t1");
+
+            case "BIN_LT" -> emit("slt t2, t0, t1"); // t0 < t1
+
+            case "BIN_GT" -> {
+                emit("slt t2, t1, t0"); // t0 > t1
+            }
+
+            case "BIN_LE" -> {
+                emit("slt t2, t1, t0");
+                emit("xori t2, t2, 1");
+            }
+
+            case "BIN_GE" -> {
+                emit("slt t2, t0, t1");
+                emit("xori t2, t2, 1");
+            }
+
+            case "BIN_EQ" -> {
+                emit("sub t2, t0, t1");
+                emit("seqz t2, t2"); // t2==0 -> 1
+            }
+
+            case "BIN_NE" -> {
+                emit("sub t2, t0, t1");
+                emit("snez t2, t2"); // t2!=0 -> 1
+            }
+            case "BIN_MOD" -> emit("rem t2, t0, t1");
+
+            default -> throw new RuntimeException("Unknown op: " + i.op);
         }
 
         store("t2", i.dst);

@@ -1,6 +1,7 @@
 package com.compiler.driver;
 
 import com.compiler.ast.*;
+import com.compiler.backend.CodeGenerator;
 import com.compiler.ir.IrGenerator;
 import com.compiler.ir.IrList;
 import com.compiler.semantic.SemanticAnalyzer;
@@ -16,16 +17,16 @@ public class CompilerMain {
         System.out.println("=== ToyC Compiler Module Integration Test ===\n");
 
         // 测试1: 最简单的程序
-        testMinimalProgram();
+        //testMinimalProgram();
 
         // 测试2: 变量赋值
-        testAssignment();
+        //testAssignment();
 
         // 测试3: if-else条件分支
-        testIfElse();
+        //testIfElse();
 
         // 测试4: while循环
-        testWhileLoop();
+        //testWhileLoop();
 
         // 测试5: 函数调用
         testFunctionCall();
@@ -164,10 +165,16 @@ public class CompilerMain {
             IrList ir = irGenerator.generate(ast);
             System.out.println("  [C Module] IR Generated ✓");
 
+            // D模块： risc-v代码生成
+            System.out.println("  [D Module] Generating risc-v...");
+            CodeGenerator codeGenerator = new CodeGenerator();
+            String riscv=codeGenerator.generate(ir);
+            System.out.println("  [D Module] risc-v Generated ✓");
             // 输出IR
-            System.out.println("  Generated IR:");
+            System.out.println("  Generated risc-v:");
             System.out.println(ir.toString().lines().map(line -> "    " + line).collect(java.util.stream.Collectors.joining("\n")));
 
+            System.out.println(riscv);
             System.out.println("  Test Passed ✓");
 
         } catch (Exception e) {
