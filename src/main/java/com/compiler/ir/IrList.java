@@ -33,7 +33,9 @@ public class IrList {
         return "L" + (labelId++);
     }
 
-    /** 返回本列表中最后生成的临时变量名，若无则返回 null。 */
+    /**
+     * 返回本列表中最后生成的临时变量名，若无则返回 null。
+     */
     public String lastTemp() {
         if (temps.isEmpty()) return null;
         return temps.get(temps.size() - 1);
@@ -51,8 +53,4 @@ public class IrList {
         }
         return sb.toString();
     }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> dev-d-backend
