@@ -1,6 +1,7 @@
 package com.compiler.ir;
 
 import com.compiler.ast.*;
+import java.util.Stack;
 
 /**
  * 将 AST 转换为三地址码的简单生成器实现（模块 C 的基础实现）。
@@ -8,6 +9,12 @@ import com.compiler.ast.*;
 public class IrGenerator implements AstVisitor<IrList> {
 
     private final IrList env = new IrList();
+    
+    /**
+     * 循环标签栈，用于处理 break 和 continue 语句
+     * 每个元素是一个数组，[0] = break目标标签, [1] = continue目标标签
+     */
+    private final Stack<String[]> loopLabels = new Stack<>();
 
     public IrList generate(CompUnitNode unit) {
         IrList r = visitCompUnit(unit);
@@ -120,6 +127,10 @@ public class IrGenerator implements AstVisitor<IrList> {
         IrList res = new IrList();
         String labelBegin = res.newLabel();
         String labelEnd = res.newLabel();
+        
+        // 将循环标签压入栈，供 break/continue 使用
+        loopLabels.push(new String[]{labelEnd, labelBegin});
+        
         res.add(IrInst.label(labelBegin));
         IrList cond = node.condition.accept(this);
         res.addAll(cond);
@@ -128,21 +139,32 @@ public class IrGenerator implements AstVisitor<IrList> {
         res.addAll(node.body.accept(this));
         res.add(IrInst.ggoto(labelBegin));
         res.add(IrInst.label(labelEnd));
+        
+        // 循环结束，弹出标签栈
+        loopLabels.pop();
+        
         return res;
     }
 
     @Override
     public IrList visitBreakStmt(BreakStmtNode node) {
         IrList res = new IrList();
-        // caller/CodeGenerator负责填充正确的 label 名称；使用 GOTO BREAK as placeholder
-        res.add(IrInst.ggoto("__BREAK"));
+        // 从栈中获取当前循环的 break 目标标签
+        if (!loopLabels.isEmpty()) {
+            String breakLabel = loopLabels.peek()[0];
+            res.add(IrInst.ggoto(breakLabel));
+        }
         return res;
     }
 
     @Override
     public IrList visitContinueStmt(ContinueStmtNode node) {
         IrList res = new IrList();
-        res.add(IrInst.ggoto("__CONTINUE"));
+        // 从栈中获取当前循环的 continue 目标标签
+        if (!loopLabels.isEmpty()) {
+            String continueLabel = loopLabels.peek()[1];
+            res.add(IrInst.ggoto(continueLabel));
+        }
         return res;
     }
 

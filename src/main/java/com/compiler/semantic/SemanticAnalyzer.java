@@ -30,26 +30,22 @@ import com.compiler.ast.WhileStmtNode;
 /**
  * 语义分析器。
  *
- * 主要职责：
- * 1. 建立并维护符号表
- * 2. 检查重复定义
- * 3. 检查未定义变量/函数
- * 4. 检查 const 是否被赋值
- * 5. 检查 break/continue 是否在循环内
- * 6. 检查 return 和函数返回类型是否匹配
- * 7. 为 IdNode 填写 symbolRef
- * 8. 为常量表达式填写 constValue
+ * 主要职责： 1. 建立并维护符号表 2. 检查重复定义 3. 检查未定义变量/函数 4. 检查 const 是否被赋值 5. 检查
+ * break/continue 是否在循环内 6. 检查 return 和函数返回类型是否匹配 7. 为 IdNode 填写 symbolRef 8.
+ * 为常量表达式填写 constValue
  */
 public class SemanticAnalyzer implements AstVisitor<Void> {
 
     private final SymbolTable symbolTable;
 
     private ValueType currentFunctionReturnType;
+    private boolean currentFunctionHasReturn;
     private int loopDepth;
 
     public SemanticAnalyzer() {
         this.symbolTable = new SymbolTable();
         this.currentFunctionReturnType = null;
+        this.currentFunctionHasReturn = false;
         this.loopDepth = 0;
     }
 
@@ -78,19 +74,18 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
     /**
      * 编译单元。
      *
-     * 顶层 items 里可能有：
-     * 1. 全局变量声明
-     * 2. 全局常量声明
-     * 3. 函数定义
+     * 顶层 items 里可能有： 1. 全局变量声明 2. 全局常量声明 3. 函数定义
      */
     @Override
     public Void visitCompUnit(CompUnitNode node) {
         /*
-         * 第一遍：先收集所有函数名。
-         *
-         * 这样可以允许函数之间互相调用。
-         * 例如 main 在前面调用 foo，而 foo 定义在后面。
+     * 第一遍：先收集所有函数名。
+     *
+     * 这样可以允许函数之间互相调用。
+     * 例如 main 在前面调用 foo，而 foo 定义在后面。
          */
+        FuncDefNode mainFunction = null;
+
         for (AstNode item : node.items) {
             if (item instanceof FuncDefNode) {
                 FuncDefNode func = (FuncDefNode) item;
@@ -101,11 +96,33 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
                 }
 
                 declareFunction(func.name, func.returnType, paramTypes);
+
+                if ("main".equals(func.name)) {
+                    mainFunction = func;
+                }
             }
         }
 
         /*
-         * 第二遍：真正检查全局声明和函数体。
+     * 检查 main 函数。
+     *
+     * ToyC 程序入口要求：
+     * int main()
+         */
+        if (mainFunction == null) {
+            throw new SemanticError("Missing main function");
+        }
+
+        if (mainFunction.returnType != ValueType.INT) {
+            throw new SemanticError("main function must return int");
+        }
+
+        if (!mainFunction.params.isEmpty()) {
+            throw new SemanticError("main function should not have parameters");
+        }
+
+        /*
+     * 第二遍：真正检查全局声明和函数体。
          */
         for (AstNode item : node.items) {
             item.accept(this);
@@ -162,8 +179,8 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
     /**
      * 内部辅助方法。
      *
-     * createNewScope 为 true：普通 block，需要新作用域。
-     * createNewScope 为 false：函数体 block，参数和函数体共享同一层作用域。
+     * createNewScope 为 true：普通 block，需要新作用域。 createNewScope 为 false：函数体
+     * block，参数和函数体共享同一层作用域。
      */
     private void visitBlockStmt(BlockStmtNode node, boolean createNewScope) {
         if (createNewScope) {
@@ -294,6 +311,8 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
             throw new SemanticError("return statement not within function");
         }
 
+        currentFunctionHasReturn = true;
+
         if (currentFunctionReturnType == ValueType.VOID) {
             if (node.value != null) {
                 throw new SemanticError("void function should not return a value");
@@ -315,11 +334,14 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
     @Override
     public Void visitFuncDef(FuncDefNode node) {
         ValueType previousReturnType = currentFunctionReturnType;
+        boolean previousHasReturn = currentFunctionHasReturn;
+
         currentFunctionReturnType = node.returnType;
+        currentFunctionHasReturn = false;
 
         /*
-         * 函数作用域：
-         * 参数和函数体第一层变量在同一个作用域内。
+     * 函数作用域：
+     * 参数和函数体第一层变量在同一个作用域内。
          */
         symbolTable.enterScope();
 
@@ -331,9 +353,14 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
             if (node.body != null) {
                 visitBlockStmt(node.body, false);
             }
+
+            if (node.returnType == ValueType.INT && !currentFunctionHasReturn) {
+                throw new SemanticError("int function must have a return statement: " + node.name);
+            }
         } finally {
             symbolTable.exitScope();
             currentFunctionReturnType = previousReturnType;
+            currentFunctionHasReturn = previousHasReturn;
         }
 
         return null;
@@ -342,8 +369,7 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
     /**
      * 函数参数。
      *
-     * 目前 FuncDefNode 里已经手动声明参数了，
-     * 这个方法保留给以后直接 visitParam 时使用。
+     * 目前 FuncDefNode 里已经手动声明参数了， 这个方法保留给以后直接 visitParam 时使用。
      */
     @Override
     public Void visitParam(ParamNode node) {
@@ -520,8 +546,8 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
         if (expectedArgCount != actualArgCount) {
             throw new SemanticError(
                     "Function argument count mismatch: " + node.funcName
-                            + ", expected " + expectedArgCount
-                            + ", got " + actualArgCount
+                    + ", expected " + expectedArgCount
+                    + ", got " + actualArgCount
             );
         }
 
