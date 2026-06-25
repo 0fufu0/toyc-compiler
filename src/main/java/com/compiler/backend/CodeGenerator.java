@@ -21,6 +21,7 @@ public class CodeGenerator {
 
     boolean collecting = false;
     boolean textEmitted = false;
+    boolean isGlobal=true;
     int tempRegCounter = 0;
     int paramBase = 0;
 
@@ -48,8 +49,6 @@ public class CodeGenerator {
 
         switch (inst.op) {
 
-            case "GLOBAL" -> genGlobal(inst);
-
             case "FUNC" -> startFunc(inst);
 
             case "ENDFUNC" -> endFunc();
@@ -58,7 +57,7 @@ public class CodeGenerator {
                 if (collecting) {
                     currentFunctionIR.add(inst);
                 } else {
-                    // global scope (暂时忽略)
+                    genGlobal(inst);
                 }
             }
         }
@@ -155,13 +154,10 @@ public class CodeGenerator {
                      "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE",
                      "BIN_EQ", "BIN_NE", "BIN_MOD" -> {
                     alloc(inst.dst);
-                    alloc(inst.a);
-                    alloc(inst.b);
                 }
 
                 case "NEG", "NOT" -> {
                     alloc(inst.dst);
-                    alloc(inst.a);
                 }
 
                 case "IFZ", "IFNZ" -> alloc(inst.a);
@@ -203,7 +199,7 @@ public class CodeGenerator {
     void alloc(String var) {
         if (var == null) return;
 
-        if (!ctx.offsetMap.containsKey(var)) {
+        if (!ctx.offsetMap.containsKey(var) && !globalVars.contains(var) && !paramOffset.containsKey(var)) {
             ctx.offset -= 4;
             ctx.offsetMap.put(var, ctx.offset);
         }
@@ -292,7 +288,11 @@ public class CodeGenerator {
         }
 
         emit(i.dst + ":");
-        emit(".word " + i.a);
+        if(i.a!=null) {
+            emit(".word " + i.a);
+        } else{
+            emit(".word " + "0");
+        }
 
         globalVars.add(i.dst);
     }

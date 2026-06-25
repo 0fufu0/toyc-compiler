@@ -9,7 +9,7 @@ import java.util.Stack;
 public class IrGenerator implements AstVisitor<IrList> {
 
     private final IrList env = new IrList();
-    
+
     /**
      * 循环标签栈，用于处理 break 和 continue 语句
      * 每个元素是一个数组，[0] = break目标标签, [1] = continue目标标签
@@ -127,10 +127,10 @@ public class IrGenerator implements AstVisitor<IrList> {
         IrList res = new IrList();
         String labelBegin = res.newLabel();
         String labelEnd = res.newLabel();
-        
+
         // 将循环标签压入栈，供 break/continue 使用
         loopLabels.push(new String[]{labelEnd, labelBegin});
-        
+
         res.add(IrInst.label(labelBegin));
         IrList cond = node.condition.accept(this);
         res.addAll(cond);
@@ -139,10 +139,10 @@ public class IrGenerator implements AstVisitor<IrList> {
         res.addAll(node.body.accept(this));
         res.add(IrInst.ggoto(labelBegin));
         res.add(IrInst.label(labelEnd));
-        
+
         // 循环结束，弹出标签栈
         loopLabels.pop();
-        
+
         return res;
     }
 
@@ -315,4 +315,3 @@ public class IrGenerator implements AstVisitor<IrList> {
     }
 
 }
-

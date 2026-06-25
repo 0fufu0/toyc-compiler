@@ -26,7 +26,7 @@ public class CompilerMain {
         //testIfElse();
 
         // 测试4: while循环
-        //testWhileLoop();
+        testWhileLoop();
 
         // 测试5: 函数调用
         //testFunctionCall();
@@ -137,7 +137,9 @@ public class CompilerMain {
         FuncDefNode addFunc = new FuncDefNode(ValueType.INT, "add", List.of(paramA, paramB), addBody);
 
         BlockStmtNode mainBody = new BlockStmtNode(List.of(
-            new ReturnStmtNode(new CallExprNode("add", List.of(new IntLiteralNode(3), new IntLiteralNode(4))))
+                new VarDeclNode("x", new IntLiteralNode(10)),
+                new VarDeclNode("y",new IntLiteralNode(20)),
+            new ReturnStmtNode(new CallExprNode("add", List.of(new BinaryExprNode(BinOp.ADD,new IdNode("x"),new IdNode("y")), new IntLiteralNode(4))))
         ));
         FuncDefNode mainFunc = new FuncDefNode(ValueType.INT, "main", List.of(), mainBody);
 
