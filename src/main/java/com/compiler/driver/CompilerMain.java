@@ -8,8 +8,7 @@ import com.compiler.parser.ToyCFrontend;
 import com.compiler.semantic.SemanticAnalyzer;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -18,25 +17,21 @@ import java.util.List;
 public class CompilerMain {
 
     public static void main(String[] args) throws IOException {
-
-        String source;
-        if (args.length > 0) {
-            source = Files.readString(Path.of(args[0]));
-        } else {
-            source = new String(System.in.readAllBytes());
+        for (String arg : args) {
+            if (!"-opt".equals(arg)) {
+                throw new IllegalArgumentException("Unknown argument: " + arg);
+            }
         }
+
+        String source = new String(System.in.readAllBytes(), StandardCharsets.UTF_8);
         CompUnitNode ast = ToyCFrontend.parse(source);
         SemanticAnalyzer semanticAnalyzer = new SemanticAnalyzer();
         ast.accept(semanticAnalyzer);
-        IrGenerator irGenerator=new IrGenerator();
+        IrGenerator irGenerator = new IrGenerator();
         IrList ir = irGenerator.generate(ast);
-        CodeGenerator codeGenerator=new CodeGenerator();
+        CodeGenerator codeGenerator = new CodeGenerator();
         String ans = codeGenerator.generate(ir);
-        if (args.length > 1) {
-            Files.writeString(Path.of(args[1]), ans);
-        } else {
-            System.out.print(ans);
-        }
+        System.out.print(ans);
     }
     /**
      * 测试1: int main() { return 42; }

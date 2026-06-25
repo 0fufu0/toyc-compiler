@@ -5,6 +5,9 @@ import com.compiler.ir.*;
 
 public class CodeGenerator {
 
+    private static final int IMM12_MIN = -2048;
+    private static final int IMM12_MAX = 2047;
+
     StringBuilder out = new StringBuilder();
 
     Map<String, Integer> offsetMap;
@@ -170,7 +173,7 @@ public class CodeGenerator {
         }
 
         allocRA();
-        stackSize = (-ctx.offset + 15 + paramBase) / 16 * 16;
+        stackSize = (ctx.offset + 4 + 15 + paramBase) / 16 * 16;
     }
 
     void allocParam(String name) {
@@ -189,16 +192,16 @@ public class CodeGenerator {
     }
 
     void allocRA() {
-        ctx.offset -= 4;
         raOffset = ctx.offset;
+        ctx.offset += 4;
     }
 
     void alloc(String var) {
         if (var == null) return;
 
         if (!ctx.offsetMap.containsKey(var) && !globalVars.contains(var) && !paramOffset.containsKey(var)) {
-            ctx.offset -= 4;
             ctx.offsetMap.put(var, ctx.offset);
+            ctx.offset += 4;
         }
     }
 
@@ -219,8 +222,7 @@ public class CodeGenerator {
         }
 
         if(offsetMap.containsKey(var)){
-            emit("lw " + reg + ", " +
-                    offsetMap.get(var) + "(sp)");
+            emitMemOp("lw", reg, offsetMap.get(var), "sp");
             return;
         }
 
@@ -243,7 +245,7 @@ public class CodeGenerator {
         }
 
         if (offsetMap.containsKey(var)) {
-            emit("sw " + reg + ", " + offsetMap.get(var) + "(sp)");
+            emitMemOp("sw", reg, offsetMap.get(var), "sp");
             return;
         }
 
@@ -255,15 +257,13 @@ public class CodeGenerator {
     }
 
     void emitPrologue() {
-
         emit("sw s0, 0(sp)");
         emit("mv s0, sp");
-        emit("addi sp, sp, -" + stackSize);
-
+        emitSpAdd(-stackSize);
     }
 
     void emitEpilogue() {
-        emit("addi sp, sp, " + stackSize);
+        emitSpAdd(stackSize);
         emit("ret");
     }
 
@@ -403,9 +403,9 @@ public class CodeGenerator {
             emit("sw t0, " + pOffset + "(sp)");
         }
         argList.clear();
-        emit("sw ra, " + raOffset + "(sp)");
+        emitMemOp("sw", "ra", raOffset, "sp");
         emit("call " + i.a);
-        emit("lw ra, " + raOffset + "(sp)");
+        emitMemOp("lw", "ra", raOffset, "sp");
         store("a0", i.dst);
     }
 
@@ -415,9 +415,28 @@ public class CodeGenerator {
             load(i.a, "a0");
         }
 
-        emit("addi sp, sp, " + stackSize);
+        emitSpAdd(stackSize);
         emit("lw s0, 0(sp)");
         emit("ret");
+    }
+
+    void emitSpAdd(int delta) {
+        if (delta >= IMM12_MIN && delta <= IMM12_MAX) {
+            emit("addi sp, sp, " + delta);
+        } else {
+            emit("li t6, " + delta);
+            emit("add sp, sp, t6");
+        }
+    }
+
+    void emitMemOp(String op, String reg, int offset, String base) {
+        if (offset >= IMM12_MIN && offset <= IMM12_MAX) {
+            emit(op + " " + reg + ", " + offset + "(" + base + ")");
+        } else {
+            emit("li t6, " + offset);
+            emit("add t6, " + base + ", t6");
+            emit(op + " " + reg + ", 0(t6)");
+        }
     }
 
     void emit(String s) {
