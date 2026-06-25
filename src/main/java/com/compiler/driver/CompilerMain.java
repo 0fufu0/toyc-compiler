@@ -180,7 +180,7 @@ public class CompilerMain {
             System.out.println("  [D Module] risc-v Generated ✓");
             // 输出IR
             System.out.println("  Generated risc-v:");
-            System.out.println(ir.toString().lines().map(line -> "    " + line).collect(java.util.stream.Collectors.joining("\n")));
+            //System.out.println(ir.toString().lines().map(line -> "    " + line).collect(java.util.stream.Collectors.joining("\n")));
 
             System.out.println(riscv);
             System.out.println("  Test Passed ✓");
