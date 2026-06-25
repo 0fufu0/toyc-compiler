@@ -76,11 +76,6 @@ public class CodeGenerator {
 
         if (!textEmitted) {
             emit(".text");
-            emit(".globl _start");
-            emit("_start:");
-            emit("call main");
-            emit("li a7, 10");
-            emit("ecall");
             textEmitted = true;
         }
         emit(".globl " + inst.dst);
