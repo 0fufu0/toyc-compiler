@@ -1,7 +1,14 @@
 package com.compiler.backend;
 
-import java.util.*;
-import com.compiler.ir.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import com.compiler.ir.IrInst;
+import com.compiler.ir.IrList;
 
 public class CodeGenerator {
 
@@ -11,6 +18,7 @@ public class CodeGenerator {
     int stackSize;
     int raOffset;
     Context ctx;
+    int s0Offset;
 
     List<IrInst> currentFunctionIR;
     Map<String, Integer> paramOffset = new HashMap<>();
@@ -21,12 +29,12 @@ public class CodeGenerator {
 
     boolean collecting = false;
     boolean textEmitted = false;
-    boolean isGlobal=true;
+    boolean isGlobal = true;
     int tempRegCounter = 0;
     int paramBase = 0;
 
-
     static class Context {
+
         Map<String, Integer> offsetMap = new HashMap<>();
         int offset = 0;
     }
@@ -49,9 +57,11 @@ public class CodeGenerator {
 
         switch (inst.op) {
 
-            case "FUNC" -> startFunc(inst);
+            case "FUNC" ->
+                startFunc(inst);
 
-            case "ENDFUNC" -> endFunc();
+            case "ENDFUNC" ->
+                endFunc();
 
             default -> {
                 if (collecting) {
@@ -102,25 +112,37 @@ public class CodeGenerator {
 
         switch (i.op) {
 
-            case "CONST" -> genConst(i);
-            case "ASSIGN" -> genAssign(i);
-            case "PARAM" -> genParam(i);
-            case "ARG" -> genArg(i);
+            case "CONST" ->
+                genConst(i);
+            case "ASSIGN" ->
+                genAssign(i);
+            case "PARAM" ->
+                genParam(i);
+            case "ARG" ->
+                genArg(i);
 
+            case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV", "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE", "BIN_EQ", "BIN_NE", "BIN_MOD" ->
+                genBinary(i);
+            case "BIN_AND", "BIN_OR" ->
+                genBinary(i);
+            case "BIN_NEG", "BIN_NOT" ->
+                genUnary(i);
+            case "LABEL" ->
+                emit(i.dst + ":");
+            case "GOTO" ->
+                emit("j " + i.dst);
 
-            case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV","BIN_LT", "BIN_GT","BIN_LE","BIN_GE","BIN_EQ","BIN_NE","BIN_MOD"-> genBinary(i);
-            case "BIN_AND", "BIN_OR" -> genBinary(i);
-            case "BIN_NEG", "BIN_NOT" -> genUnary(i);
-            case "LABEL" -> emit(i.dst + ":");
-            case "GOTO" -> emit("j " + i.dst);
+            case "IFZ" ->
+                genIfz(i);
+            case "IFNZ" ->
+                genIfnz(i);
 
-
-            case "IFZ" -> genIfz(i);
-            case "IFNZ" -> genIfnz(i);
-
-            case "CALL" -> genCall(i);
-            case "RET" -> genRet(i);
-            default -> throw new RuntimeException("Unknown op: " + i.op);
+            case "CALL" ->
+                genCall(i);
+            case "RET" ->
+                genRet(i);
+            default ->
+                throw new RuntimeException("Unknown op: " + i.op);
         }
     }
 
@@ -141,48 +163,77 @@ public class CodeGenerator {
                     allocParam(inst.dst);
                 }
 
-
                 case "CONST", "ASSIGN" -> {
                     alloc(inst.dst);
-                    if (isVariable(inst.a)) alloc(inst.a);
+                    if (isVariable(inst.a)) {
+                        alloc(inst.a);
+                    }
                 }
 
-                case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV",
-                     "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE",
-                     "BIN_EQ", "BIN_NE", "BIN_MOD" -> {
+                case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV", "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE", "BIN_EQ", "BIN_NE", "BIN_MOD" -> {
                     alloc(inst.dst);
                 }
 
-                case "NEG", "NOT" -> {
+                case "BIN_NEG", "BIN_NOT" -> {
                     alloc(inst.dst);
                 }
 
-                case "IFZ", "IFNZ" -> alloc(inst.a);
+                case "IFZ", "IFNZ" ->
+                    alloc(inst.a);
 
                 case "CALL" -> {
-                    if (isVariable(inst.dst)) alloc(inst.dst);
+                    if (isVariable(inst.dst)) {
+                        alloc(inst.dst);
+                    }
                 }
 
                 case "RET" -> {
-                    if (isVariable(inst.a)) alloc(inst.a);
+                    if (isVariable(inst.a)) {
+                        alloc(inst.a);
+                    }
                 }
             }
         }
 
         allocRA();
+        allocS0();
+
+        int outgoingArgBytes = computeOutgoingArgBytes(insts);
         stackSize = (-ctx.offset + 15 + paramBase) / 16 * 16;
+    }
+
+    int computeOutgoingArgBytes(List<IrInst> insts) {
+        int currentArgCount = 0;
+        int maxArgCount = 0;
+        boolean hasCall = false;
+
+        for (IrInst inst : insts) {
+            if ("ARG".equals(inst.op)) {
+                currentArgCount++;
+            } else if ("CALL".equals(inst.op)) {
+                hasCall = true;
+                maxArgCount = Math.max(maxArgCount, currentArgCount);
+                currentArgCount = 0;
+            }
+        }
+
+        if (!hasCall) {
+            return 0;
+        }
+
+        return maxArgCount * 4;
     }
 
     void allocParam(String name) {
 
-        if (name == null) return;
+        if (name == null) {
+            return;
+        }
 
         //System.out.println(name);
-
         paramBase += 4;
         paramOffset.put(name, paramBase);
     }
-
 
     String allocTemp() {
         return "t" + (tempRegCounter++ % 7); // t0-t6循环
@@ -193,8 +244,15 @@ public class CodeGenerator {
         raOffset = ctx.offset;
     }
 
+    void allocS0() {
+        ctx.offset -= 4;
+        s0Offset = ctx.offset;
+    }
+
     void alloc(String var) {
-        if (var == null) return;
+        if (var == null) {
+            return;
+        }
 
         if (!ctx.offsetMap.containsKey(var) && !globalVars.contains(var) && !paramOffset.containsKey(var)) {
             ctx.offset -= 4;
@@ -212,15 +270,15 @@ public class CodeGenerator {
             emit("li " + reg + ", " + var);
             return;
         }
-        if (paramOffset!=null && paramOffset.containsKey(var)) {
+        if (paramOffset != null && paramOffset.containsKey(var)) {
             //System.out.println("HIT PARAM");
             emit("lw " + reg + ", " + paramOffset.get(var) + "(s0)");
             return;
         }
 
-        if(offsetMap.containsKey(var)){
-            emit("lw " + reg + ", " +
-                    offsetMap.get(var) + "(sp)");
+        if (offsetMap.containsKey(var)) {
+            emit("lw " + reg + ", "
+                    + offsetMap.get(var) + "(s0)");
             return;
         }
 
@@ -230,12 +288,13 @@ public class CodeGenerator {
             emit("lw " + reg + ", 0(t6)");
         }
 
-
     }
 
     void store(String reg, String var) {
 
-        if (!isVariable(var)) return;
+        if (!isVariable(var)) {
+            return;
+        }
 
         if (paramOffset.containsKey(var)) {
             emit("sw " + reg + ", " + paramOffset.get(var) + "(s0)");
@@ -243,10 +302,9 @@ public class CodeGenerator {
         }
 
         if (offsetMap.containsKey(var)) {
-            emit("sw " + reg + ", " + offsetMap.get(var) + "(sp)");
+            emit("sw " + reg + ", " + offsetMap.get(var) + "(s0)");
             return;
         }
-
 
         if (globalVars.contains(var)) {
             emit("la t6, " + var);
@@ -255,14 +313,13 @@ public class CodeGenerator {
     }
 
     void emitPrologue() {
-
-        emit("sw s0, 0(sp)");
-        emit("mv s0, sp");
         emit("addi sp, sp, -" + stackSize);
-
+        emit("sw s0, " + (stackSize + s0Offset) + "(sp)");
+        emit("addi s0, sp, " + stackSize);
     }
 
     void emitEpilogue() {
+        emit("lw s0, " + s0Offset + "(s0)");
         emit("addi sp, sp, " + stackSize);
         emit("ret");
     }
@@ -285,9 +342,9 @@ public class CodeGenerator {
         }
 
         emit(i.dst + ":");
-        if(i.a!=null) {
+        if (i.a != null) {
             emit(".word " + i.a);
-        } else{
+        } else {
             emit(".word " + "0");
         }
 
@@ -298,9 +355,7 @@ public class CodeGenerator {
         argList.add(i.dst);
     }
 
-    void genParam(IrInst i){
-
-
+    void genParam(IrInst i) {
 
     }
 
@@ -310,12 +365,17 @@ public class CodeGenerator {
         load(i.b, "t1");
 
         switch (i.op) {
-            case "BIN_ADD" -> emit("add t2, t0, t1");
-            case "BIN_SUB" -> emit("sub t2, t0, t1");
-            case "BIN_MUL" -> emit("mul t2, t0, t1");
-            case "BIN_DIV" -> emit("div t2, t0, t1");
+            case "BIN_ADD" ->
+                emit("add t2, t0, t1");
+            case "BIN_SUB" ->
+                emit("sub t2, t0, t1");
+            case "BIN_MUL" ->
+                emit("mul t2, t0, t1");
+            case "BIN_DIV" ->
+                emit("div t2, t0, t1");
 
-            case "BIN_LT" -> emit("slt t2, t0, t1"); // t0 < t1
+            case "BIN_LT" ->
+                emit("slt t2, t0, t1"); // t0 < t1
 
             case "BIN_GT" -> {
                 emit("slt t2, t1, t0"); // t0 > t1
@@ -340,7 +400,8 @@ public class CodeGenerator {
                 emit("sub t2, t0, t1");
                 emit("snez t2, t2"); // t2!=0 -> 1
             }
-            case "BIN_MOD" -> emit("rem t2, t0, t1");
+            case "BIN_MOD" ->
+                emit("rem t2, t0, t1");
 
             case "BIN_AND" -> {
                 // t2 = t0 & t1 (非短路)
@@ -356,7 +417,8 @@ public class CodeGenerator {
                 emit("or t2, t0, t1");
             }
 
-            default -> throw new RuntimeException("Unknown op: " + i.op);
+            default ->
+                throw new RuntimeException("Unknown op: " + i.op);
         }
 
         store("t2", i.dst);
@@ -378,7 +440,8 @@ public class CodeGenerator {
                 emit("seqz t2, t0");
             }
 
-            default -> throw new RuntimeException("Unknown unary op: " + i.op);
+            default ->
+                throw new RuntimeException("Unknown unary op: " + i.op);
         }
 
         store("t2", i.dst);
@@ -395,17 +458,17 @@ public class CodeGenerator {
     }
 
     void genCall(IrInst i) {
-        int pOffset=0;
+        int pOffset = 0;
         //System.out.println(argList.size());
         for (int k = 0; k < argList.size(); k++) {
             load(argList.get(k), "t0");
-            pOffset+=4;
+            pOffset += 4;
             emit("sw t0, " + pOffset + "(sp)");
         }
         argList.clear();
-        emit("sw ra, " + raOffset + "(sp)");
+        emit("sw ra, " + raOffset + "(s0)");
         emit("call " + i.a);
-        emit("lw ra, " + raOffset + "(sp)");
+        emit("lw ra, " + raOffset + "(s0)");
         store("a0", i.dst);
     }
 
@@ -415,8 +478,8 @@ public class CodeGenerator {
             load(i.a, "a0");
         }
 
+        emit("lw s0, " + s0Offset + "(s0)");
         emit("addi sp, sp, " + stackSize);
-        emit("lw s0, 0(sp)");
         emit("ret");
     }
 
