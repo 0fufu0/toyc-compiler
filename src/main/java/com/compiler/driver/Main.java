@@ -25,6 +25,7 @@ public class Main {
         ast.accept(semanticAnalyzer);
         IrGenerator irGenerator=new IrGenerator();
         IrList ir = irGenerator.generate(ast);
+        System.out.println(ir.toString().lines().map(line -> "    " + line).collect(java.util.stream.Collectors.joining("\n")));
         CodeGenerator codeGenerator=new CodeGenerator();
         String ans = codeGenerator.generate(ir);
         if (args.length > 1) {

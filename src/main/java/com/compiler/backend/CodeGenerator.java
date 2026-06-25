@@ -76,6 +76,11 @@ public class CodeGenerator {
 
         if (!textEmitted) {
             emit(".text");
+            emit(".globl _start");
+            emit("_start:");
+            emit("call main");
+            emit("li a7, 10");
+            emit("ecall");
             textEmitted = true;
         }
         emit(".globl " + inst.dst);
@@ -256,9 +261,9 @@ public class CodeGenerator {
 
     void emitPrologue() {
 
-        emit("addi sp, sp, -" + stackSize);
         emit("sw s0, 0(sp)");
         emit("mv s0, sp");
+        emit("addi sp, sp, -" + stackSize);
 
     }
 
@@ -415,8 +420,8 @@ public class CodeGenerator {
             load(i.a, "a0");
         }
 
-        emit("lw s0, 0(sp)");
         emit("addi sp, sp, " + stackSize);
+        emit("lw s0, 0(sp)");
         emit("ret");
     }
 

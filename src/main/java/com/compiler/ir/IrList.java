@@ -10,7 +10,7 @@ import java.util.List;
 public class IrList {
 
     private final List<IrInst> insts = new ArrayList<>();
-    private int tmpId = 0;
+    static private int tmpId = 0;
     private int labelId = 0;
     private final java.util.List<String> temps = new ArrayList<>();
 
