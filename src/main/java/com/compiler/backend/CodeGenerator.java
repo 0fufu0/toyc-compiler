@@ -154,13 +154,10 @@ public class CodeGenerator {
                      "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE",
                      "BIN_EQ", "BIN_NE", "BIN_MOD" -> {
                     alloc(inst.dst);
-                    alloc(inst.a);
-                    alloc(inst.b);
                 }
 
                 case "NEG", "NOT" -> {
                     alloc(inst.dst);
-                    alloc(inst.a);
                 }
 
                 case "IFZ", "IFNZ" -> alloc(inst.a);
@@ -202,7 +199,7 @@ public class CodeGenerator {
     void alloc(String var) {
         if (var == null) return;
 
-        if (!ctx.offsetMap.containsKey(var)) {
+        if (!ctx.offsetMap.containsKey(var) && !globalVars.contains(var) && !paramOffset.containsKey(var)) {
             ctx.offset -= 4;
             ctx.offsetMap.put(var, ctx.offset);
         }
