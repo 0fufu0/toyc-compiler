@@ -109,7 +109,8 @@ public class CodeGenerator {
 
 
             case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV","BIN_LT", "BIN_GT","BIN_LE","BIN_GE","BIN_EQ","BIN_NE","BIN_MOD"-> genBinary(i);
-            case "NEG", "NOT" -> genUnary(i);
+            case "BIN_AND", "BIN_OR" -> genBinary(i);
+            case "BIN_NEG", "BIN_NOT" -> genUnary(i);
             case "LABEL" -> emit(i.dst + ":");
             case "GOTO" -> emit("j " + i.dst);
 
@@ -341,6 +342,20 @@ public class CodeGenerator {
             }
             case "BIN_MOD" -> emit("rem t2, t0, t1");
 
+            case "BIN_AND" -> {
+                // t2 = t0 & t1 (非短路)
+                emit("snez t0, t0");
+                emit("snez t1, t1");
+                emit("and t2, t0, t1");
+            }
+
+            case "BIN_OR" -> {
+                // t2 = t0 | t1 (非短路)
+                emit("snez t0, t0");
+                emit("snez t1, t1");
+                emit("or t2, t0, t1");
+            }
+
             default -> throw new RuntimeException("Unknown op: " + i.op);
         }
 
@@ -353,12 +368,12 @@ public class CodeGenerator {
 
         switch (i.op) {
 
-            case "NEG" -> {
+            case "NEG", "BIN_NEG" -> {
                 // t2 = -t0
                 emit("sub t2, x0, t0");
             }
 
-            case "NOT" -> {
+            case "NOT", "BIN_NOT" -> {
                 // t2 = (t0 == 0)
                 emit("seqz t2, t0");
             }
