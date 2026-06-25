@@ -21,6 +21,7 @@ public class CodeGenerator {
 
     boolean collecting = false;
     boolean textEmitted = false;
+    boolean isGlobal=true;
     int tempRegCounter = 0;
     int paramBase = 0;
 
@@ -48,8 +49,6 @@ public class CodeGenerator {
 
         switch (inst.op) {
 
-            case "GLOBAL" -> genGlobal(inst);
-
             case "FUNC" -> startFunc(inst);
 
             case "ENDFUNC" -> endFunc();
@@ -58,7 +57,7 @@ public class CodeGenerator {
                 if (collecting) {
                     currentFunctionIR.add(inst);
                 } else {
-                    // global scope (暂时忽略)
+                    genGlobal(inst);
                 }
             }
         }
@@ -292,7 +291,11 @@ public class CodeGenerator {
         }
 
         emit(i.dst + ":");
-        emit(".word " + i.a);
+        if(i.a!=null) {
+            emit(".word " + i.a);
+        } else{
+            emit(".word " + "0");
+        }
 
         globalVars.add(i.dst);
     }
