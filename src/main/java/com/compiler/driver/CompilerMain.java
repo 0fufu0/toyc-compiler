@@ -26,7 +26,7 @@ public class CompilerMain {
         //testIfElse();
 
         // 测试4: while循环
-        testWhileLoop();
+        //testWhileLoop();
 
         // 测试5: 函数调用
         //testFunctionCall();
@@ -60,6 +60,7 @@ public class CompilerMain {
         // 构造AST
         BlockStmtNode body = new BlockStmtNode(List.of(
             new VarDeclNode("x", new IntLiteralNode(10)),
+            new VarDeclNode("y",new IntLiteralNode(20)),
             new AssignStmtNode("x", new IntLiteralNode(20)),
             new ReturnStmtNode(new IdNode("x"))
         ));
