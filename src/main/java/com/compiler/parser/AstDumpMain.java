@@ -20,13 +20,4 @@ public final class AstDumpMain {
     private AstDumpMain() {
     }
 
-    public static void main(String[] args) throws Exception {
-        String source;
-        if (args.length > 0) {
-            source = Files.readString(Path.of(args[0]));
-        } else {
-            source = new String(System.in.readAllBytes());
-        }
-        System.out.println(AstDumper.dump(ToyCFrontend.parse(source)));
-    }
 }

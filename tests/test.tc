@@ -1,0 +1,8 @@
+int g = 10;
+
+int main() {
+    int a = 3;
+    int b = 5;
+    int c = a + b + g;
+    return c;
+}

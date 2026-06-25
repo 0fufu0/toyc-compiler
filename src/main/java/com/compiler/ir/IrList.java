@@ -14,6 +14,10 @@ public class IrList {
     private int labelId = 0;
     private final java.util.List<String> temps = new ArrayList<>();
 
+    public int getTmpId() {
+        return tmpId;
+    }
+
     public void add(IrInst inst) {
         insts.add(inst);
     }
