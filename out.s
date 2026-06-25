@@ -1,9 +1,4 @@
 .text
-.globl _start
-_start:
-call main
-li a7, 10
-ecall
 .globl sum
 sum:
 sw s0, 0(sp)
