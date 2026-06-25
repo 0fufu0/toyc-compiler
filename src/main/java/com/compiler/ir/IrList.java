@@ -21,6 +21,8 @@ public class IrList {
     public void addAll(IrList other) {
         if (other == null) return;
         insts.addAll(other.insts);
+        temps.addAll(other.temps);
+        this.tmpId = Math.max(this.tmpId, other.tmpId);
     }
 
     public String newTemp() {

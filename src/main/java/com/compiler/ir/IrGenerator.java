@@ -208,15 +208,17 @@ public class IrGenerator implements AstVisitor<IrList> {
             // short-circuit AND
             IrList left = node.left.accept(this);
             res.addAll(left);
-            String ltmp = left.newTemp();
+            String leftResult = res.newTemp(); // 为left结果分配独立temp
+            res.add(IrInst.assign(leftResult, left.lastTemp()));
             String lblFalse = res.newLabel();
             String lblEnd = res.newLabel();
             String dest = res.newTemp();
-            res.add(IrInst.ifz(ltmp, lblFalse));
+            res.add(IrInst.ifz(leftResult, lblFalse));
             IrList right = node.right.accept(this);
             res.addAll(right);
-            String rtmp = right.newTemp();
-            res.add(IrInst.bin(dest, "AND", ltmp, rtmp));
+            String rightResult = res.newTemp(); // 为right结果分配独立temp
+            res.add(IrInst.assign(rightResult, right.lastTemp()));
+            res.add(IrInst.bin(dest, "AND", leftResult, rightResult));
             res.add(IrInst.ggoto(lblEnd));
             res.add(IrInst.label(lblFalse));
             res.add(IrInst.constant(dest, 0));
@@ -226,15 +228,17 @@ public class IrGenerator implements AstVisitor<IrList> {
             // short-circuit OR
             IrList left = node.left.accept(this);
             res.addAll(left);
-            String ltmp = left.newTemp();
+            String leftResult = res.newTemp(); // 为left结果分配独立temp
+            res.add(IrInst.assign(leftResult, left.lastTemp()));
             String lblTrue = res.newLabel();
             String lblEnd = res.newLabel();
             String dest = res.newTemp();
-            res.add(IrInst.ifnz(ltmp, lblTrue));
+            res.add(IrInst.ifnz(leftResult, lblTrue));
             IrList right = node.right.accept(this);
             res.addAll(right);
-            String rtmp = right.newTemp();
-            res.add(IrInst.bin(dest, "OR", ltmp, rtmp));
+            String rightResult = res.newTemp(); // 为right结果分配独立temp
+            res.add(IrInst.assign(rightResult, right.lastTemp()));
+            res.add(IrInst.bin(dest, "OR", leftResult, rightResult));
             res.add(IrInst.ggoto(lblEnd));
             res.add(IrInst.label(lblTrue));
             res.add(IrInst.constant(dest, 1));
@@ -242,13 +246,15 @@ public class IrGenerator implements AstVisitor<IrList> {
             return res;
         } else {
             IrList left = node.left.accept(this);
-            IrList right = node.right.accept(this);
             res.addAll(left);
+            String leftResult = res.newTemp(); // 为left结果分配独立temp
+            res.add(IrInst.assign(leftResult, left.lastTemp()));
+            IrList right = node.right.accept(this);
             res.addAll(right);
-            String a = left.newTemp();
-            String b = right.newTemp();
+            String rightResult = res.newTemp(); // 为right结果分配独立temp
+            res.add(IrInst.assign(rightResult, right.lastTemp()));
             String dest = res.newTemp();
-            res.add(IrInst.bin(dest, node.op.name(), a, b));
+            res.add(IrInst.bin(dest, node.op.name(), leftResult, rightResult));
             return res;
         }
     }

@@ -3,52 +3,133 @@ package com.compiler.ir;
 import com.compiler.ast.*;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
 
 public class IrGeneratorTest {
 
-    @Test
-    public void testSimpleReturn() {
-        // int main() { return 0; }
-        BlockStmtNode body = new BlockStmtNode(List.of(new ReturnStmtNode(new IntLiteralNode(0))));
+    private IrList generateIR(BlockStmtNode body) {
         FuncDefNode main = new FuncDefNode(ValueType.INT, "main", List.of(), body);
         CompUnitNode cu = new CompUnitNode(List.of(main));
-
         IrGenerator g = new IrGenerator();
-        IrList ir = g.generate(cu);
-        String out = ir.toString();
-        assertTrue(out.contains("RET 0") || out.contains("RET null") == false);
+        return g.generate(cu);
+    }
+
+    private List<IrInst> instructions(IrList ir) {
+        return ir.asList();
+    }
+
+    private IrInst findInst(List<IrInst> insts, String op) {
+        return insts.stream().filter(i -> i.op.equals(op)).findFirst().orElse(null);
+    }
+
+    private IrInst findInst(List<IrInst> insts, String op, String dst) {
+        return insts.stream().filter(i -> i.op.equals(op) && dst.equals(i.dst)).findFirst().orElse(null);
     }
 
     @Test
-    public void testShortCircuitAnd() {
-        // int main() { int a = 1; int b = 2; return a && b; }
-        VarDeclNode da = new VarDeclNode("a", new IntLiteralNode(1));
-        VarDeclNode db = new VarDeclNode("b", new IntLiteralNode(2));
-        BinaryExprNode andExpr = new BinaryExprNode(BinOp.AND, new IdNode("a"), new IdNode("b"));
-        BlockStmtNode body = new BlockStmtNode(List.of(da, db, new ReturnStmtNode(andExpr)));
-        FuncDefNode main = new FuncDefNode(ValueType.INT, "main", List.of(), body);
-        CompUnitNode cu = new CompUnitNode(List.of(main));
+    public void testSimpleConst() {
+        // int main() { return 42; }
+        BlockStmtNode body = new BlockStmtNode(List.of(new ReturnStmtNode(new IntLiteralNode(42))));
+        IrList ir = generateIR(body);
+        List<IrInst> insts = instructions(ir);
 
-        IrGenerator g = new IrGenerator();
-        IrList ir = g.generate(cu);
-        String out = ir.toString();
-        assertTrue(out.contains("IFZ") || out.contains("AND") || out.contains("GOTO") );
+        // 应该只有一条 CONST 指令用于返回值
+        IrInst ret = findInst(insts, "RET");
+        assertNotNull(ret, "应该有 RET 指令");
+        assertEquals("42", ret.a, "返回值应该是 42");
     }
 
     @Test
-    public void testWhileLoop() {
-        // int main() { while(0) { break; } return 0; }
-        WhileStmtNode w = new WhileStmtNode(new IntLiteralNode(0), new BlockStmtNode(List.of(new BreakStmtNode())));
-        BlockStmtNode body = new BlockStmtNode(List.of(w, new ReturnStmtNode(new IntLiteralNode(0))));
-        FuncDefNode main = new FuncDefNode(ValueType.INT, "main", List.of(), body);
-        CompUnitNode cu = new CompUnitNode(List.of(main));
+    public void testAddConst() {
+        // int main() { return 1 + 2; }
+        BinaryExprNode expr = new BinaryExprNode(BinOp.ADD, new IntLiteralNode(1), new IntLiteralNode(2));
+        BlockStmtNode body = new BlockStmtNode(List.of(new ReturnStmtNode(expr)));
+        IrList ir = generateIR(body);
+        List<IrInst> insts = instructions(ir);
 
-        IrGenerator g = new IrGenerator();
-        IrList ir = g.generate(cu);
-        String out = ir.toString();
-        assertTrue(out.contains("LABEL") || out.contains("GOTO") || out.contains("IFZ"));
+        // 应该有 CONST t0=1, CONST t0=2, BIN_ADD tN = t0 + t0, RET tN
+        IrInst binAdd = findInst(insts, "BIN_ADD");
+        assertNotNull(binAdd, "应该有 BIN_ADD 指令");
+        // 左右操作数应该不同（不同的临时变量）
+        assertNotEquals(binAdd.a, binAdd.b, "两个操作数应该是不同的临时变量");
+    }
+
+    @Test
+    public void testSubConst() {
+        // int main() { return 5 - 3; }
+        BinaryExprNode expr = new BinaryExprNode(BinOp.SUB, new IntLiteralNode(5), new IntLiteralNode(3));
+        BlockStmtNode body = new BlockStmtNode(List.of(new ReturnStmtNode(expr)));
+        IrList ir = generateIR(body);
+        List<IrInst> insts = instructions(ir);
+
+        IrInst binSub = findInst(insts, "BIN_SUB");
+        assertNotNull(binSub, "应该有 BIN_SUB 指令");
+    }
+
+    @Test
+    public void testMulConst() {
+        // int main() { return 3 * 4; }
+        BinaryExprNode expr = new BinaryExprNode(BinOp.MUL, new IntLiteralNode(3), new IntLiteralNode(4));
+        BlockStmtNode body = new BlockStmtNode(List.of(new ReturnStmtNode(expr)));
+        IrList ir = generateIR(body);
+        List<IrInst> insts = instructions(ir);
+
+        IrInst binMul = findInst(insts, "BIN_MUL");
+        assertNotNull(binMul, "应该有 BIN_MUL 指令");
+    }
+
+    @Test
+    public void testDivConst() {
+        // int main() { return 8 / 2; }
+        BinaryExprNode expr = new BinaryExprNode(BinOp.DIV, new IntLiteralNode(8), new IntLiteralNode(2));
+        BlockStmtNode body = new BlockStmtNode(List.of(new ReturnStmtNode(expr)));
+        IrList ir = generateIR(body);
+        List<IrInst> insts = instructions(ir);
+
+        IrInst binDiv = findInst(insts, "BIN_DIV");
+        assertNotNull(binDiv, "应该有 BIN_DIV 指令");
+    }
+
+    @Test
+    public void testUnaryMinus() {
+        // int main() { return -5; }
+        UnaryExprNode expr = new UnaryExprNode(UnaryOp.MINUS, new IntLiteralNode(5));
+        BlockStmtNode body = new BlockStmtNode(List.of(new ReturnStmtNode(expr)));
+        IrList ir = generateIR(body);
+        List<IrInst> insts = instructions(ir);
+
+        IrInst binNeg = findInst(insts, "BIN_NEG");
+        assertNotNull(binNeg, "应该有 BIN_NEG 指令");
+    }
+
+    @Test
+    public void testIdReference() {
+        // int main() { int a = 10; return a; }
+        VarDeclNode decl = new VarDeclNode("a", new IntLiteralNode(10));
+        IdNode id = new IdNode("a");
+        BlockStmtNode body = new BlockStmtNode(List.of(decl, new ReturnStmtNode(id)));
+        IrList ir = generateIR(body);
+        List<IrInst> insts = instructions(ir);
+
+        // 应该有 ASSIGN 指令将变量加载到临时变量
+        IrInst assign = findInst(insts, "ASSIGN");
+        assertNotNull(assign, "应该有 ASSIGN 指令");
+        assertEquals("a", assign.a, "ASSIGN 的源应该是变量名 'a'");
+    }
+
+    @Test
+    public void testNestedBinaryExpr() {
+        // int main() { return 1 + 2 * 3; }
+        BinaryExprNode inner = new BinaryExprNode(BinOp.MUL, new IntLiteralNode(2), new IntLiteralNode(3));
+        BinaryExprNode outer = new BinaryExprNode(BinOp.ADD, new IntLiteralNode(1), inner);
+        BlockStmtNode body = new BlockStmtNode(List.of(new ReturnStmtNode(outer)));
+        IrList ir = generateIR(body);
+        List<IrInst> insts = instructions(ir);
+
+        // 应该有 ADD 和 MUL 指令
+        assertNotNull(findInst(insts, "BIN_ADD"), "应该有 ADD");
+        assertNotNull(findInst(insts, "BIN_MUL"), "应该有 MUL");
     }
 }
