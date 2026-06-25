@@ -9,7 +9,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
  * ToyC 前端解析入口（自定义 AST，不直接暴露 ANTLR ParseTree）。
  */
 public final class ToyCFrontend {
-
+/*
     private ToyCFrontend() {
     }
 
@@ -19,7 +19,7 @@ public final class ToyCFrontend {
      * @param source 完整源码字符串
      * @return AST 根节点
      * @throws ParseException 词法或语法错误（含行列号）
-     */
+     *//*
     public static CompUnitNode parse(String source) {
         var lexer = new ToyCLexer(CharStreams.fromString(source));
         lexer.removeErrorListeners();
@@ -33,5 +33,5 @@ public final class ToyCFrontend {
         var tree = parser.compUnit();
         AstNode result = new AstBuilder().visitCompUnit(tree);
         return (CompUnitNode) result;
-    }
+    }*/
 }

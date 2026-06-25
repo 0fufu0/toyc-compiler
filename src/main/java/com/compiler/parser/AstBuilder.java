@@ -10,8 +10,8 @@ import java.util.List;
 /**
  * ANTLR ParseTree → 自定义 AST 的转换器。
  */
-public class AstBuilder extends ToyCBaseVisitor<AstNode> {
-
+public class AstBuilder {
+/*
     private static <T extends AstNode> T withPos(T node, ParserRuleContext ctx) {
         if (ctx != null && ctx.start != null) {
             node.line = ctx.start.getLine();
@@ -244,5 +244,5 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
             return BinOp.EQ;
         }
         return BinOp.NE;
-    }
+    }*/
 }
