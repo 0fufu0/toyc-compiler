@@ -309,9 +309,9 @@ public class IrGenerator implements AstVisitor<IrList> {
     public IrList visitCallExpr(CallExprNode node) {
         IrList res = new IrList();
         // evaluate args
-        for (ExprNode e : node.args) {
-            res.addAll(e.accept(this));
-            res.add(IrInst.arg(res.lastTemp()));
+        for (int i=0;i<node.args.size();i++) {
+            res.addAll(node.args.get(i).accept(this));
+            res.add(IrInst.arg("t"+(IrList.getTmpId()-1)));
         }
         String dst = res.newTemp();
         res.add(IrInst.call(dst, node.funcName));
