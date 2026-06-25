@@ -61,6 +61,9 @@ public class IrInst {
         return new IrInst("ENDFUNC", null, null, null);
     }
 
+    public static IrInst param(String name) {return new IrInst("PARAM",name,null,null);}
+
+    public static IrInst arg(String name){return new IrInst("ARG",name,null,null);}
     @Override
     public String toString() {
         switch (op) {

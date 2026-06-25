@@ -191,6 +191,9 @@ public class IrGenerator implements AstVisitor<IrList> {
         IrList res = new IrList();
         res.add(IrInst.func(node.name));
         // params are handled by semantic layer; just generate body
+        for(int i=0;i<node.params.size();i++){
+            res.add(IrInst.param(node.params.get(i).name));
+        }
         res.addAll(node.body.accept(this));
         res.add(IrInst.endFunc());
         return res;
@@ -308,6 +311,7 @@ public class IrGenerator implements AstVisitor<IrList> {
         // evaluate args
         for (ExprNode e : node.args) {
             res.addAll(e.accept(this));
+            res.add(IrInst.arg(res.lastTemp()));
         }
         String dst = res.newTemp();
         res.add(IrInst.call(dst, node.funcName));

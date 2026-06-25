@@ -14,7 +14,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $cpFile = Join-Path $env:TEMP "toyc-cp.txt"
 mvn -q -DincludeScope=runtime "-Dmdep.outputFile=$cpFile" dependency:build-classpath
 $cp = "target/classes;" + (Get-Content $cpFile -Raw).Trim()
-java -cp $cp com.compiler.parser.AstDumpMain $File
+$javaExe = if ($env:JAVA_HOME) { Join-Path $env:JAVA_HOME "bin\java.exe" } else { "java" }
+& $javaExe -cp $cp com.compiler.parser.AstDumpMain $File
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host ""

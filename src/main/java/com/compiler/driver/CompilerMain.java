@@ -4,8 +4,12 @@ import com.compiler.ast.*;
 import com.compiler.backend.CodeGenerator;
 import com.compiler.ir.IrGenerator;
 import com.compiler.ir.IrList;
+import com.compiler.parser.ToyCFrontend;
 import com.compiler.semantic.SemanticAnalyzer;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -13,30 +17,31 @@ import java.util.List;
  */
 public class CompilerMain {
 
-    public static void main(String[] args) {
-        System.out.println("=== ToyC Compiler Module Integration Test ===\n");
+    public static void main(String[] args) throws IOException {
 
-        // 测试1: 最简单的程序
-        //testMinimalProgram();
-
-        // 测试2: 变量赋值
-        //testAssignment();
-
-        // 测试3: if-else条件分支
-        //testIfElse();
-
-        // 测试4: while循环
-        testWhileLoop();
-
-        // 测试5: 函数调用
-        //testFunctionCall();
-
-        System.out.println("\n=== All Module Tests Passed ===");
+        String source;
+        if (args.length > 0) {
+            source = Files.readString(Path.of(args[0]));
+        } else {
+            source = new String(System.in.readAllBytes());
+        }
+        CompUnitNode ast = ToyCFrontend.parse(source);
+        SemanticAnalyzer semanticAnalyzer = new SemanticAnalyzer();
+        ast.accept(semanticAnalyzer);
+        IrGenerator irGenerator=new IrGenerator();
+        IrList ir = irGenerator.generate(ast);
+        CodeGenerator codeGenerator=new CodeGenerator();
+        String ans = codeGenerator.generate(ir);
+        if (args.length > 1) {
+            Files.writeString(Path.of(args[1]), ans);
+        } else {
+            System.out.print(ans);
+        }
     }
-
     /**
      * 测试1: int main() { return 42; }
      */
+
     private static void testMinimalProgram() {
         System.out.println("Test 1: Minimal Program (return 42)");
 

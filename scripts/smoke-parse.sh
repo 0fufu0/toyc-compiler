@@ -9,7 +9,8 @@ FILE="${1:-src/test/resources/smoke/add.tc}"
 echo "==> smoke parse: $FILE"
 mvn -q compile
 CP="target/classes:$(mvn -q -DincludeScope=runtime -Dmdep.outputFile=/dev/stdout dependency:build-classpath)"
-java -cp "$CP" com.compiler.parser.AstDumpMain "$FILE"
+JAVA="${JAVA_HOME:+$JAVA_HOME/bin/}java"
+"$JAVA" -cp "$CP" com.compiler.parser.AstDumpMain "$FILE"
 
 echo
 echo "==> smoke junit"

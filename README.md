@@ -133,15 +133,21 @@ class IrVisitor implements AstVisitor<IrList> { ... }
 
 ## 当前进度
 
-| 模块 | 状态 |
-|------|------|
-| Maven 工程与 ANTLR 插件 | ✅ 已完成 |
-| ToyC.g4 文法 | ✅ 已完成 |
-| AST 节点 + `AstVisitor` | ✅ 已完成 |
-| `ToyCFrontend.parse()` | 🚧 桩实现（第 2 天完成 AST 构建） |
-| 语义分析 | ⬜ 待成员 B 实现 |
-| IR 生成 | ✅ 模块 C 已实现（IrInst / IrList / IrGenerator，含单元测试） |
-| 汇编生成与集成 | ✅ 已完成所有测试且通过 |
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| Maven 工程与 ANTLR 插件 | ✅ 已完成 | JDK 21，`visitor=true` |
+| ToyC.g4 文法 | ✅ 已完成 | 与课程文法一致 |
+| AST 节点 + `AstVisitor` | ✅ 已完成 | 24 个节点类/枚举 |
+| `ToyCFrontend` + `AstBuilder` | ✅ 已完成 | `parse(source)` → AST，含行列号报错 |
+| 语义分析（B） | ✅ 已完成 | `SemanticAnalyzer`，符号表 / 类型检查 / 常量折叠 |
+| IR 生成（C） | ✅ 已完成 | `IrInst` / `IrList` / `IrGenerator`，含短路求值 |
+| 汇编生成（D） | ✅ 已完成 | `CodeGenerator` → RISC-V32 |
+| 全链路联调 | ✅ 测试通过 | `FrontendIntegrationTest`：parse → B → C → D |
+| 主程序 `CompilerMain` | 🚧 待完善 | 当前为模块联调 demo（手拼 AST），待接入 stdin + `ToyCFrontend.parse()` |
+
+**测试**：`mvn test` — **66** 个用例全部通过（前端 30 / 语义 14 / IR 22）。
+
+前端独立冒烟：`.\scripts\smoke-parse.ps1`（需 `JAVA_HOME` 指向 JDK 21）。
 
 ## 相关文档
 
