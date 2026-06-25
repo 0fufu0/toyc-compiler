@@ -92,7 +92,7 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.compiler.driver.CompilerMain</mainClass>
+                                    <mainClass>com.compiler.driver.Main</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>

@@ -263,9 +263,9 @@ public class CodeGenerator {
 
     void emitPrologue() {
 
+        emit("addi sp, sp, -" + stackSize);
         emit("sw s0, 0(sp)");
         emit("mv s0, sp");
-        emit("addi sp, sp, -" + stackSize);
 
     }
 
@@ -404,9 +404,8 @@ public class CodeGenerator {
             load(i.a, "a0");
         }
 
-
-        emit("addi sp, sp, " + stackSize);
         emit("lw s0, 0(sp)");
+        emit("addi sp, sp, " + stackSize);
         emit("ret");
     }
 
