@@ -27,6 +27,6 @@ public final class AstDumpMain {
         } else {
             source = new String(System.in.readAllBytes());
         }
-        System.out.println(AstDumper.dump(ToyCFrontend.parse(source)));
+        //System.out.println(AstDumper.dump(ToyCFrontend.parse(source)));
     }
 }
