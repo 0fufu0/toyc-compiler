@@ -63,3 +63,5 @@ bin/
 .env.*
 *.pem
 *.key
+tests/functional/
+scripts/run-tests.sh

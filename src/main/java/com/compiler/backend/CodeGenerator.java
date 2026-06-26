@@ -323,13 +323,23 @@ public class CodeGenerator {
     }
 
     void genConst(IrInst i) {
-        load(i.a, "t0");
-        store("t0", i.dst);
+        if (!isVariable(i.a)) {
+            emit("li t0, " + i.a);
+            store("t0", i.dst);
+        } else {
+            load(i.a, "t0");
+            store("t0", i.dst);
+        }
     }
 
     void genAssign(IrInst i) {
-        load(i.a, "t0");
-        store("t0", i.dst);
+        if (!isVariable(i.a)) {
+            emit("li t0, " + i.a);
+            store("t0", i.dst);
+        } else {
+            load(i.a, "t0");
+            store("t0", i.dst);
+        }
     }
 
     void genGlobal(IrInst i) {
@@ -371,12 +381,14 @@ public class CodeGenerator {
                 emit("mul t2, t0, t1");
             case "BIN_DIV" ->
                 emit("div t2, t0, t1");
+            case "BIN_SLL" ->
+                emit("sll t2, t0, t1");
 
             case "BIN_LT" ->
-                emit("slt t2, t0, t1"); // t0 < t1
+                emit("slt t2, t0, t1");
 
             case "BIN_GT" -> {
-                emit("slt t2, t1, t0"); // t0 > t1
+                emit("slt t2, t1, t0");
             }
 
             case "BIN_LE" -> {
@@ -391,25 +403,23 @@ public class CodeGenerator {
 
             case "BIN_EQ" -> {
                 emit("sub t2, t0, t1");
-                emit("seqz t2, t2"); // t2==0 -> 1
+                emit("seqz t2, t2");
             }
 
             case "BIN_NE" -> {
                 emit("sub t2, t0, t1");
-                emit("snez t2, t2"); // t2!=0 -> 1
+                emit("snez t2, t2");
             }
             case "BIN_MOD" ->
                 emit("rem t2, t0, t1");
 
             case "BIN_AND" -> {
-                // t2 = t0 & t1 (非短路)
                 emit("snez t0, t0");
                 emit("snez t1, t1");
                 emit("and t2, t0, t1");
             }
 
             case "BIN_OR" -> {
-                // t2 = t0 | t1 (非短路)
                 emit("snez t0, t0");
                 emit("snez t1, t1");
                 emit("or t2, t0, t1");
