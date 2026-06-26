@@ -199,7 +199,7 @@ public class CodeGenerator {
         allocS0();
 
         int outgoingArgBytes = computeOutgoingArgBytes(insts);
-        stackSize = (-ctx.offset + 15 + paramBase) / 16 * 16;
+        stackSize = (-ctx.offset + outgoingArgBytes + 15) / 16 * 16;
     }
 
     int computeOutgoingArgBytes(List<IrInst> insts) {
@@ -217,11 +217,12 @@ public class CodeGenerator {
             }
         }
 
-        if (!hasCall) {
+        if (!hasCall || maxArgCount == 0) {
             return 0;
         }
 
-        return maxArgCount * 4;
+// genCall 现在从 4(sp) 开始放参数，所以要多预留 4 字节，避免覆盖当前函数自己的局部变量 / ra / s0
+        return maxArgCount * 4 + 4;
     }
 
     void allocParam(String name) {
