@@ -12,11 +12,11 @@ decl
     ;
 
 constDecl
-    : CONST INT ID ASSIGN expr SEMI
+    : CONST INT STAR* ID ASSIGN expr SEMI
     ;
 
 varDecl
-    : INT ID ASSIGN expr SEMI
+    : INT STAR* ID ASSIGN expr SEMI
     ;
 
 stmt
@@ -37,7 +37,7 @@ block
     ;
 
 funcDef
-    : (INT | VOID) ID LPAREN paramList? RPAREN block
+    : (INT | VOID) STAR* ID LPAREN paramList? RPAREN block
     ;
 
 paramList
@@ -45,7 +45,7 @@ paramList
     ;
 
 param
-    : INT ID
+    : INT STAR* ID
     ;
 
 expr
@@ -133,7 +133,7 @@ NUMBER
     : '0'
     | [1-9][0-9]*
     ;
-    
+
 ID
     : [_a-zA-Z] [_a-zA-Z0-9]*
     ;
