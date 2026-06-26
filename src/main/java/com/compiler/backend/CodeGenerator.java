@@ -226,28 +226,7 @@ public class CodeGenerator {
 // genCall 现在从 4(sp) 开始放参数，所以要多预留 4 字节，避免覆盖当前函数自己的局部变量 / ra / s0
         return maxArgCount * 4 + 4;
     }
-
-    int computeOutgoingArgBytes(List<IrInst> insts) {
-        int currentArgCount = 0;
-        int maxArgCount = 0;
-        boolean hasCall = false;
-
-        for (IrInst inst : insts) {
-            if ("ARG".equals(inst.op)) {
-                currentArgCount++;
-            } else if ("CALL".equals(inst.op)) {
-                hasCall = true;
-                maxArgCount = Math.max(maxArgCount, currentArgCount);
-                currentArgCount = 0;
-            }
-        }
-
-        if (!hasCall) {
-            return 0;
-        }
-
-        return maxArgCount * 4;
-    }
+    
 
     void allocParam(String name) {
 
