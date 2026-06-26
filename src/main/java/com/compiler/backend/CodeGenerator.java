@@ -64,9 +64,6 @@ public class CodeGenerator {
             case "ENDFUNC" ->
                 endFunc();
 
-            case "GLOBAL" ->
-                genGlobal(inst);
-
             default -> {
                 if (collecting) {
                     currentFunctionIR.add(inst);
@@ -128,7 +125,7 @@ public class CodeGenerator {
             case "ARG" ->
                 genArg(i);
 
-            case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV", "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE", "BIN_EQ", "BIN_NE", "BIN_MOD", "BIN_SLL" ->
+            case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV", "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE", "BIN_EQ", "BIN_NE", "BIN_MOD" ->
                 genBinary(i);
             case "BIN_AND", "BIN_OR" ->
                 genBinary(i);
@@ -176,15 +173,13 @@ public class CodeGenerator {
                 }
 
                 case "CONST", "ASSIGN" -> {
-                    if (!paramNames.contains(inst.dst)) {
-                        alloc(inst.dst);
-                    }
-                    if (isVariable(inst.a) && !paramNames.contains(inst.a)) {
+                    alloc(inst.dst);
+                    if (isVariable(inst.a)) {
                         alloc(inst.a);
                     }
                 }
 
-                case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV", "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE", "BIN_EQ", "BIN_NE", "BIN_MOD", "BIN_SLL" -> {
+                case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV", "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE", "BIN_EQ", "BIN_NE", "BIN_MOD", "BIN_AND", "BIN_OR" -> {
                     alloc(inst.dst);
                 }
 
@@ -192,18 +187,17 @@ public class CodeGenerator {
                     alloc(inst.dst);
                 }
 
-                case "IFZ", "IFNZ" -> {
+                case "IFZ", "IFNZ" ->
                     alloc(inst.a);
-                }
 
                 case "CALL" -> {
-                    if (isVariable(inst.dst) && !isTemp(inst.dst)) {
+                    if (isVariable(inst.dst)) {
                         alloc(inst.dst);
                     }
                 }
 
                 case "RET" -> {
-                    if (isVariable(inst.a) && !isTemp(inst.a)) {
+                    if (isVariable(inst.a)) {
                         alloc(inst.a);
                     }
                 }
@@ -232,11 +226,12 @@ public class CodeGenerator {
             }
         }
 
-        if (!hasCall) {
+        if (!hasCall || maxArgCount == 0) {
             return 0;
         }
 
-        return maxArgCount * 4;
+// genCall 现在从 4(sp) 开始放参数，所以要多预留 4 字节，避免覆盖当前函数自己的局部变量 / ra / s0
+        return maxArgCount * 4 + 4;
     }
 
     void allocParam(String name) {
@@ -245,8 +240,9 @@ public class CodeGenerator {
             return;
         }
 
-        ctx.offset -= 4;
-        paramOffset.put(name, ctx.offset);
+        //System.out.println(name);
+        paramBase += 4;
+        paramOffset.put(name, paramBase);
     }
 
     String allocTemp() {
@@ -268,6 +264,11 @@ public class CodeGenerator {
             return;
         }
 
+    void alloc(String var) {
+        if (var == null) {
+            return;
+        }
+
         if (!ctx.offsetMap.containsKey(var) && !globalVars.contains(var) && !paramNames.contains(var)) {
             ctx.offset -= 4;
             ctx.offsetMap.put(var, ctx.offset);
@@ -283,18 +284,15 @@ public class CodeGenerator {
             emit("li " + reg + ", " + var);
             return;
         }
-        
-        int paramIdx = paramNames.indexOf(var);
-        if (paramIdx >= 0) {
-            String[] argRegs = {"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7"};
-            if (paramIdx < argRegs.length) {
-                emit("mv " + reg + ", " + argRegs[paramIdx]);
-                return;
-            }
+        if (paramOffset != null && paramOffset.containsKey(var)) {
+            //System.out.println("HIT PARAM");
+            emit("lw " + reg + ", " + paramOffset.get(var) + "(s0)");
+            return;
         }
 
         if (offsetMap.containsKey(var)) {
-            emitLw(reg, offsetMap.get(var), "s0");
+            emit("lw " + reg + ", "
+                    + offsetMap.get(var) + "(s0)");
             return;
         }
 
@@ -316,7 +314,7 @@ public class CodeGenerator {
         }
 
         if (offsetMap.containsKey(var)) {
-            emitSw(reg, offsetMap.get(var), "s0");
+            emit("sw " + reg + ", " + offsetMap.get(var) + "(s0)");
             return;
         }
 
@@ -327,14 +325,14 @@ public class CodeGenerator {
     }
 
     void emitPrologue() {
-        emitAddi("sp", "sp", -stackSize);
-        emitSw("s0", stackSize + s0Offset, "sp");
-        emitAddi("s0", "sp", stackSize);
+        emit("addi sp, sp, -" + stackSize);
+        emit("sw s0, " + (stackSize + s0Offset) + "(sp)");
+        emit("addi s0, sp, " + stackSize);
     }
 
     void emitEpilogue() {
-        emitLw("s0", stackSize + s0Offset, "sp");
-        emitAddi("sp", "sp", stackSize);
+        emit("lw s0, " + s0Offset + "(s0)");
+        emit("addi sp, sp, " + stackSize);
         emit("ret");
     }
 
@@ -399,11 +397,9 @@ public class CodeGenerator {
                 emit("mul t2, t0, t1");
             case "BIN_DIV" ->
                 emit("div t2, t0, t1");
-            case "BIN_SLL" ->
-                emit("sll t2, t0, t1");
 
             case "BIN_LT" ->
-                emit("slt t2, t0, t1");
+                emit("slt t2, t0, t1"); // t0 < t1
 
             case "BIN_GT" -> {
                 emit("slt t2, t1, t0");
@@ -484,22 +480,17 @@ public class CodeGenerator {
     }
 
     void genCall(IrInst i) {
-        String[] argRegs = {"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7"};
         int pOffset = 0;
+        //System.out.println(argList.size());
         for (int k = 0; k < argList.size(); k++) {
-            String arg = argList.get(k);
-            load(arg, "t0");
-            if (k < argRegs.length) {
-                emit("mv " + argRegs[k] + ", t0");
-            } else {
-                pOffset += 4;
-                emitSw("t0", pOffset, "sp");
-            }
+            load(argList.get(k), "t0");
+            pOffset += 4;
+            emit("sw t0, " + pOffset + "(sp)");
         }
         argList.clear();
-        emitSw("ra", raOffset, "s0");
+        emit("sw ra, " + raOffset + "(s0)");
         emit("call " + i.a);
-        emitLw("ra", raOffset, "s0");
+        emit("lw ra, " + raOffset + "(s0)");
         store("a0", i.dst);
     }
 
@@ -509,41 +500,12 @@ public class CodeGenerator {
             load(i.a, "a0");
         }
 
-        emitLw("s0", stackSize + s0Offset, "sp");
-        emitAddi("sp", "sp", stackSize);
+        emit("lw s0, " + s0Offset + "(s0)");
+        emit("addi sp, sp, " + stackSize);
         emit("ret");
     }
 
     void emit(String s) {
         out.append(s).append("\n");
-    }
-
-    void emitAddi(String lhs, String rhs, int imm) {
-        if (imm >= -2048 && imm <= 2047) {
-            emit("addi " + lhs + ", " + rhs + ", " + imm);
-        } else {
-            emit("li t6, " + imm);
-            emit("add " + lhs + ", " + rhs + ", t6");
-        }
-    }
-
-    void emitLw(String rd, int offset, String base) {
-        if (offset >= -2048 && offset <= 2047) {
-            emit("lw " + rd + ", " + offset + "(" + base + ")");
-        } else {
-            emit("li t6, " + offset);
-            emit("add t6, t6, " + base);
-            emit("lw " + rd + ", 0(t6)");
-        }
-    }
-
-    void emitSw(String rs2, int offset, String base) {
-        if (offset >= -2048 && offset <= 2047) {
-            emit("sw " + rs2 + ", " + offset + "(" + base + ")");
-        } else {
-            emit("li t6, " + offset);
-            emit("add t6, t6, " + base);
-            emit("sw " + rs2 + ", 0(t6)");
-        }
     }
 }
