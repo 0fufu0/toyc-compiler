@@ -132,4 +132,29 @@ public class IrGeneratorTest {
         assertNotNull(findInst(insts, "BIN_ADD"), "应该有 ADD");
         assertNotNull(findInst(insts, "BIN_MUL"), "应该有 MUL");
     }
+
+    @Test
+    public void testBreakContinue() {
+        // while (i < 10) { if (i == 5) { break; } if (i == 3) { continue; } }
+        VarDeclNode iDecl = new VarDeclNode("i", new IntLiteralNode(0));
+        BinaryExprNode cond = new BinaryExprNode(BinOp.LT, new IdNode("i"), new IntLiteralNode(10));
+        
+        // if (i == 5) { break; }
+        BinaryExprNode cond1 = new BinaryExprNode(BinOp.EQ, new IdNode("i"), new IntLiteralNode(5));
+        IfStmtNode if1 = new IfStmtNode(cond1, new BreakStmtNode(), null);
+        
+        // if (i == 3) { continue; }
+        BinaryExprNode cond2 = new BinaryExprNode(BinOp.EQ, new IdNode("i"), new IntLiteralNode(3));
+        IfStmtNode if2 = new IfStmtNode(cond2, new ContinueStmtNode(), null);
+        
+        WhileStmtNode whileStmt = new WhileStmtNode(cond, new BlockStmtNode(List.of(if1, if2)));
+        BlockStmtNode body = new BlockStmtNode(List.of(iDecl, whileStmt, new ReturnStmtNode(new IntLiteralNode(0))));
+        
+        IrList ir = generateIR(body);
+        List<IrInst> insts = instructions(ir);
+        
+        // 验证 break 和 continue 的跳转目标
+        IrInst gotoBreak = insts.stream().filter(i -> i.op.equals("GOTO")).findFirst().orElse(null);
+        assertNotNull(gotoBreak, "应该有 GOTO (break)");
+    }
 }

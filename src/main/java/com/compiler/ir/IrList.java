@@ -10,9 +10,9 @@ import java.util.List;
 public class IrList {
 
     private final List<IrInst> insts = new ArrayList<>();
-    static private int tmpId = 0;
-    private int labelId = 0;
-    private final java.util.List<String> temps = new ArrayList<>();
+    private static int tmpId = 0;
+    private static int labelId = 0;  // 改为 static，全局统一标签编号
+    private final List<String> temps = new ArrayList<>();
 
     public static int getTmpId() {
         return tmpId;
@@ -24,41 +24,29 @@ public class IrList {
 
     public void addAll(IrList other) {
         if (other == null) return;
-        // 重命名 other 中的标签避免冲突
-        java.util.Map<String, String> labelMap = new java.util.HashMap<>();
+        // 不需要重命名标签，因为 labelId 是全局统一的
         for (IrInst inst : other.insts) {
-            if ("LABEL".equals(inst.op) && inst.dst != null && inst.dst.startsWith("L")) {
-                if (!labelMap.containsKey(inst.dst)) {
-                    String newName = "L" + (this.labelId++);
-                    labelMap.put(inst.dst, newName);
-                }
-            }
-        }
-        for (IrInst inst : other.insts) {
-            IrInst renamed = remapLabels(inst, labelMap);
-            insts.add(renamed);
+            insts.add(inst);
         }
         temps.addAll(other.temps);
-        this.tmpId = Math.max(this.tmpId, other.tmpId);
-    }
-
-    private static IrInst remapLabels(IrInst inst, java.util.Map<String, String> labelMap) {
-        if (labelMap.isEmpty()) return inst;
-        String newDst = (inst.dst != null && labelMap.containsKey(inst.dst)) ? labelMap.get(inst.dst) : inst.dst;
-        String newA = (inst.a != null && labelMap.containsKey(inst.a)) ? labelMap.get(inst.a) : inst.a;
-        String newB = (inst.b != null && labelMap.containsKey(inst.b)) ? labelMap.get(inst.b) : inst.b;
-        if (newDst == inst.dst && newA == inst.a && newB == inst.b) return inst;
-        return new IrInst(inst.op, newDst, newA, newB);
     }
 
     public String newTemp() {
-        String name = "t" + (tmpId++);
+        String name = "tmp" + (tmpId++);
         temps.add(name);
         return name;
     }
 
     public String newLabel() {
         return "L" + (labelId++);
+    }
+
+    /**
+     * 重置计数器（用于新编译单元）
+     */
+    public static void reset() {
+        tmpId = 0;
+        labelId = 0;
     }
 
     /**

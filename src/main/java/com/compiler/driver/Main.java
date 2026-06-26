@@ -4,7 +4,7 @@ import com.compiler.ast.CompUnitNode;
 import com.compiler.backend.CodeGenerator;
 import com.compiler.ir.IrGenerator;
 import com.compiler.ir.IrList;
-import com.compiler.ir.Optimizer;
+import com.compiler.ir.IrOptimizer;
 import com.compiler.parser.ToyCFrontend;
 import com.compiler.semantic.SemanticAnalyzer;
 
@@ -44,7 +44,7 @@ public class Main {
         IrList ir = irGenerator.generate(ast);
 
         if (optimize) {
-            Optimizer optimizer = new Optimizer();
+            IrOptimizer optimizer = new IrOptimizer();
             ir = optimizer.optimize(ir);
         }
 

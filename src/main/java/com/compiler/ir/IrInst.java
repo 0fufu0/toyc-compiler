@@ -64,6 +64,14 @@ public class IrInst {
     public static IrInst param(String name) {return new IrInst("PARAM",name,null,null);}
 
     public static IrInst arg(String name){return new IrInst("ARG",name,null,null);}
+    
+    public static IrInst global(String name, int value) {
+        return new IrInst("GLOBAL", name, Integer.toString(value), null);
+    }
+    
+    public static IrInst global(String name, Integer value) {
+        return new IrInst("GLOBAL", name, value != null ? Integer.toString(value) : null, null);
+    }
     @Override
     public String toString() {
         switch (op) {

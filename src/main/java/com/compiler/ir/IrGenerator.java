@@ -15,8 +15,24 @@ public class IrGenerator implements AstVisitor<IrList> {
      * 每个元素是一个数组，[0] = break目标标签, [1] = continue目标标签
      */
     private final Stack<String[]> loopLabels = new Stack<>();
+    
+    private boolean inGlobalScope = true;
+    
+    /**
+     * 作用域栈，用于处理变量阴影
+     * 每个元素是当前作用域的前缀
+     */
+    private final Stack<String> scopeStack = new Stack<>();
+    
+    private int scopeId = 0;
+    
+    /**
+     * 当前作用域中定义的变量（用于查找正确的作用域变量）
+     */
+    private final Stack<java.util.Set<String>> scopeVarsStack = new Stack<>();
 
     public IrList generate(CompUnitNode unit) {
+        IrList.reset();  // 重置计数器
         IrList r = visitCompUnit(unit);
         env.addAll(r);
         return env;
@@ -39,13 +55,26 @@ public class IrGenerator implements AstVisitor<IrList> {
     @Override
     public IrList visitConstDecl(ConstDeclNode node) {
         IrList res = new IrList();
-        IrList initList = node.init.accept(this);
-        res.addAll(initList);
-        String resultTemp = initList.lastTemp();
-        if (node.init.constValue != null) {
-            res.add(IrInst.constant(node.name, node.init.constValue));
-        } else if (resultTemp != null) {
-            res.add(IrInst.assign(node.name, resultTemp));
+        if (inGlobalScope) {
+            if (node.init.constValue != null) {
+                res.add(IrInst.global(node.name, node.init.constValue));
+            } else {
+                IrList initList = node.init.accept(this);
+                res.addAll(initList);
+                String resultTemp = initList.lastTemp();
+                if (resultTemp != null) {
+                    res.add(IrInst.global(node.name, Integer.parseInt(resultTemp)));
+                }
+            }
+        } else {
+            IrList initList = node.init.accept(this);
+            res.addAll(initList);
+            String resultTemp = initList.lastTemp();
+            if (node.init.constValue != null) {
+                res.add(IrInst.constant(node.name, node.init.constValue));
+            } else if (resultTemp != null) {
+                res.add(IrInst.assign(node.name, resultTemp));
+            }
         }
         return res;
     }
@@ -53,25 +82,59 @@ public class IrGenerator implements AstVisitor<IrList> {
     @Override
     public IrList visitVarDecl(VarDeclNode node) {
         IrList res = new IrList();
-        IrList init = node.init.accept(this);
-        res.addAll(init);
-        String resultTemp = init.lastTemp();
-        if (node.init.constValue != null) {
-            res.add(IrInst.constant(node.name, node.init.constValue));
-        } else if (resultTemp != null) {
-            res.add(IrInst.assign(node.name, resultTemp));
+        // 将变量添加到当前作用域
+        if (!inGlobalScope && !scopeVarsStack.isEmpty()) {
+            scopeVarsStack.peek().add(node.name);
+        }
+        String scopedName = getScopedName(node.name);
+        if (inGlobalScope) {
+            if (node.init.constValue != null) {
+                res.add(IrInst.global(scopedName, node.init.constValue));
+            } else {
+                IrList init = node.init.accept(this);
+                res.addAll(init);
+                String resultTemp = init.lastTemp();
+                if (resultTemp != null) {
+                    res.add(IrInst.global(scopedName, Integer.parseInt(resultTemp)));
+                }
+            }
+        } else {
+            IrList init = node.init.accept(this);
+            res.addAll(init);
+            String resultTemp = init.lastTemp();
+            if (node.init.constValue != null) {
+                res.add(IrInst.constant(scopedName, node.init.constValue));
+            } else if (resultTemp != null) {
+                res.add(IrInst.assign(scopedName, resultTemp));
+            }
         }
         return res;
     }
 
     @Override
     public IrList visitBlockStmt(BlockStmtNode node) {
+        return visitBlockStmt(node, true);
+    }
+    
+    private IrList visitBlockStmt(BlockStmtNode node, boolean createNewScope) {
         IrList res = new IrList();
-        for (AstNode n : node.stmts) {
-            if (n instanceof StmtNode) {
-                res.addAll(((StmtNode) n).accept(this));
-            } else if (n instanceof DeclNode) {
-                res.addAll(((DeclNode) n).accept(this));
+        if (createNewScope) {
+            String scopePrefix = "s" + (scopeId++);
+            scopeStack.push(scopePrefix);
+            scopeVarsStack.push(new java.util.HashSet<>());
+        }
+        try {
+            for (AstNode n : node.stmts) {
+                if (n instanceof StmtNode) {
+                    res.addAll(((StmtNode) n).accept(this));
+                } else if (n instanceof DeclNode) {
+                    res.addAll(((DeclNode) n).accept(this));
+                }
+            }
+        } finally {
+            if (createNewScope) {
+                scopeStack.pop();
+                scopeVarsStack.pop();
             }
         }
         return res;
@@ -190,11 +253,14 @@ public class IrGenerator implements AstVisitor<IrList> {
     public IrList visitFuncDef(FuncDefNode node) {
         IrList res = new IrList();
         res.add(IrInst.func(node.name));
-        // params are handled by semantic layer; just generate body
         for(int i=0;i<node.params.size();i++){
             res.add(IrInst.param(node.params.get(i).name));
         }
-        res.addAll(node.body.accept(this));
+        boolean prevScope = inGlobalScope;
+        inGlobalScope = false;
+        // 调用 visitBlockStmt，但不在函数体级别创建新作用域（与语义分析一致）
+        res.addAll(visitBlockStmt(node.body, false));
+        inGlobalScope = prevScope;
         res.add(IrInst.endFunc());
         return res;
     }
@@ -208,40 +274,38 @@ public class IrGenerator implements AstVisitor<IrList> {
     public IrList visitBinaryExpr(BinaryExprNode node) {
         IrList res = new IrList();
         if (node.op == BinOp.AND) {
-            // short-circuit AND
+            // short-circuit AND: if left is false, result is false (skip right)
             IrList left = node.left.accept(this);
             res.addAll(left);
-            String leftResult = res.newTemp(); // 为left结果分配独立temp
-            res.add(IrInst.assign(leftResult, left.lastTemp()));
+            String leftResult = left.lastTemp();
             String lblFalse = res.newLabel();
             String lblEnd = res.newLabel();
             String dest = res.newTemp();
             res.add(IrInst.ifz(leftResult, lblFalse));
+            // left is true, evaluate right
             IrList right = node.right.accept(this);
             res.addAll(right);
-            String rightResult = res.newTemp(); // 为right结果分配独立temp
-            res.add(IrInst.assign(rightResult, right.lastTemp()));
-            res.add(IrInst.bin(dest, "AND", leftResult, rightResult));
+            String rightResult = right.lastTemp();
+            res.add(IrInst.assign(dest, rightResult));
             res.add(IrInst.ggoto(lblEnd));
             res.add(IrInst.label(lblFalse));
             res.add(IrInst.constant(dest, 0));
             res.add(IrInst.label(lblEnd));
             return res;
         } else if (node.op == BinOp.OR) {
-            // short-circuit OR
+            // short-circuit OR: if left is true, result is true (skip right)
             IrList left = node.left.accept(this);
             res.addAll(left);
-            String leftResult = res.newTemp(); // 为left结果分配独立temp
-            res.add(IrInst.assign(leftResult, left.lastTemp()));
+            String leftResult = left.lastTemp();
             String lblTrue = res.newLabel();
             String lblEnd = res.newLabel();
             String dest = res.newTemp();
             res.add(IrInst.ifnz(leftResult, lblTrue));
+            // left is false, evaluate right
             IrList right = node.right.accept(this);
             res.addAll(right);
-            String rightResult = res.newTemp(); // 为right结果分配独立temp
-            res.add(IrInst.assign(rightResult, right.lastTemp()));
-            res.add(IrInst.bin(dest, "OR", leftResult, rightResult));
+            String rightResult = right.lastTemp();
+            res.add(IrInst.assign(dest, rightResult));
             res.add(IrInst.ggoto(lblEnd));
             res.add(IrInst.label(lblTrue));
             res.add(IrInst.constant(dest, 1));
@@ -250,12 +314,10 @@ public class IrGenerator implements AstVisitor<IrList> {
         } else {
             IrList left = node.left.accept(this);
             res.addAll(left);
-            String leftResult = res.newTemp(); // 为left结果分配独立temp
-            res.add(IrInst.assign(leftResult, left.lastTemp()));
+            String leftResult = left.lastTemp();
             IrList right = node.right.accept(this);
             res.addAll(right);
-            String rightResult = res.newTemp(); // 为right结果分配独立temp
-            res.add(IrInst.assign(rightResult, right.lastTemp()));
+            String rightResult = right.lastTemp();
             String dest = res.newTemp();
             res.add(IrInst.bin(dest, node.op.name(), leftResult, rightResult));
             return res;
@@ -286,14 +348,13 @@ public class IrGenerator implements AstVisitor<IrList> {
     @Override
     public IrList visitId(IdNode node) {
         IrList res = new IrList();
-        if (node.constValue != null) {
-            String dst = res.newTemp();
-            res.add(IrInst.constant(dst, node.constValue));
-            return res;
-        }
+        String scopedName = getScopedName(node.name);
         String dst = res.newTemp();
-        // load variable by name (ASSIGN temp = varName)
-        res.add(IrInst.assign(dst, node.name));
+        if (node.constValue != null) {
+            res.add(IrInst.constant(dst, node.constValue));
+        } else {
+            res.add(IrInst.assign(dst, scopedName));
+        }
         return res;
     }
 
@@ -310,12 +371,29 @@ public class IrGenerator implements AstVisitor<IrList> {
         IrList res = new IrList();
         // evaluate args
         for (int i=0;i<node.args.size();i++) {
-            res.addAll(node.args.get(i).accept(this));
-            res.add(IrInst.arg("t"+(IrList.getTmpId()-1)));
+            IrList argResult = node.args.get(i).accept(this);
+            res.addAll(argResult);
+            res.add(IrInst.arg(argResult.lastTemp()));
         }
         String dst = res.newTemp();
         res.add(IrInst.call(dst, node.funcName));
         return res;
+    }
+
+    private String getScopedName(String name) {
+        if (scopeStack.isEmpty() || inGlobalScope) {
+            return name;
+        }
+        // 从内层到外层查找变量
+        for (int i = scopeStack.size() - 1; i >= 0; i--) {
+            String prefix = scopeStack.get(i);
+            String scopedName = prefix + "_" + name;
+            if (scopeVarsStack.get(i).contains(name)) {
+                return scopedName;
+            }
+        }
+        // 如果找不到，返回原始名称（可能是全局变量或参数）
+        return name;
     }
 
 }
