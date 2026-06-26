@@ -45,6 +45,20 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
         return node;
     }
 
+    private int parseIntLiteralSafely(String text) {
+        long value = Long.parseLong(text);
+
+        if (value == 2147483648L) {
+            return Integer.MIN_VALUE;
+        }
+
+        if (value > Integer.MAX_VALUE) {
+            throw new ParseException("Integer literal out of range: " + text);
+        }
+
+        return (int) value;
+    }
+
     @Override
     public AstNode visitCompUnit(ToyCParser.CompUnitContext ctx) {
         List<AstNode> items = new ArrayList<>();
@@ -257,7 +271,7 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
     @Override
     public AstNode visitPrimaryExpr(ToyCParser.PrimaryExprContext ctx) {
         if (ctx.NUMBER() != null) {
-            return withPos(new IntLiteralNode(Integer.parseInt(ctx.NUMBER().getText())), ctx);
+            return withPos(new IntLiteralNode(parseIntLiteralSafely(ctx.NUMBER().getText())), ctx);
         }
         if (ctx.expr() != null) {
             return visit(ctx.expr());
