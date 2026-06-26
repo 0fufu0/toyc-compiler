@@ -1,11 +1,36 @@
 package com.compiler.parser;
 
-import com.compiler.ast.*;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.compiler.ast.AssignStmtNode;
+import com.compiler.ast.AstNode;
+import com.compiler.ast.BinOp;
+import com.compiler.ast.BinaryExprNode;
+import com.compiler.ast.BlockStmtNode;
+import com.compiler.ast.BreakStmtNode;
+import com.compiler.ast.CallExprNode;
+import com.compiler.ast.CompUnitNode;
+import com.compiler.ast.ConstDeclNode;
+import com.compiler.ast.ContinueStmtNode;
+import com.compiler.ast.EmptyStmtNode;
+import com.compiler.ast.ExprNode;
+import com.compiler.ast.ExprStmtNode;
+import com.compiler.ast.FuncDefNode;
+import com.compiler.ast.IdNode;
+import com.compiler.ast.IfStmtNode;
+import com.compiler.ast.IntLiteralNode;
+import com.compiler.ast.ParamNode;
+import com.compiler.ast.ReturnStmtNode;
+import com.compiler.ast.StmtNode;
+import com.compiler.ast.UnaryExprNode;
+import com.compiler.ast.UnaryOp;
+import com.compiler.ast.ValueType;
+import com.compiler.ast.VarDeclNode;
+import com.compiler.ast.WhileStmtNode;
 
 /**
  * ANTLR ParseTree → 自定义 AST 的转换器。
@@ -192,6 +217,27 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
     @Override
     public AstNode visitUnaryExpr(ToyCParser.UnaryExprContext ctx) {
         if (ctx.unaryExpr() != null) {
+            // 把 -42 这种负数字面量折叠成 IntLiteralNode(-42)
+            // 这样既能避免 x-1 被词法器识别错，又能兼容原来的测试。
+            if (ctx.MINUS() != null) {
+                ToyCParser.UnaryExprContext child = ctx.unaryExpr();
+
+                if (child != null
+                        && child.primaryExpr() != null
+                        && child.primaryExpr().NUMBER() != null) {
+                    String text = child.primaryExpr().NUMBER().getText();
+
+                    if ("2147483648".equals(text)) {
+                        return withPos(new IntLiteralNode(Integer.MIN_VALUE), ctx);
+                    }
+
+                    long value = Long.parseLong(text);
+                    if (value <= Integer.MAX_VALUE) {
+                        return withPos(new IntLiteralNode((int) -value), ctx);
+                    }
+                }
+            }
+
             UnaryOp op;
             if (ctx.PLUS() != null) {
                 op = UnaryOp.PLUS;
@@ -200,9 +246,11 @@ public class AstBuilder extends ToyCBaseVisitor<AstNode> {
             } else {
                 op = UnaryOp.NOT;
             }
+
             ExprNode operand = (ExprNode) visit(ctx.unaryExpr());
             return withPos(new UnaryExprNode(op, operand), ctx);
         }
+
         return visit(ctx.primaryExpr());
     }
 
