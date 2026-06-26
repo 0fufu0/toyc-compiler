@@ -170,7 +170,7 @@ public class CodeGenerator {
                     }
                 }
 
-                case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV", "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE", "BIN_EQ", "BIN_NE", "BIN_MOD" -> {
+                case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV", "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE", "BIN_EQ", "BIN_NE", "BIN_MOD", "BIN_AND", "BIN_OR" -> {
                     alloc(inst.dst);
                 }
 

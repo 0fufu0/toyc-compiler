@@ -48,6 +48,8 @@ public class IrGenerator implements AstVisitor<IrList> {
     }
 
     public IrList generate(CompUnitNode unit) {
+        IrList.resetCounters();
+
         IrList r = visitCompUnit(unit);
         env.addAll(r);
         return env;
@@ -239,59 +241,89 @@ public class IrGenerator implements AstVisitor<IrList> {
     @Override
     public IrList visitBinaryExpr(BinaryExprNode node) {
         IrList res = new IrList();
+
         if (node.op == BinOp.AND) {
             // short-circuit AND
             IrList left = node.left.accept(this);
             res.addAll(left);
-            String leftResult = res.newTemp(); // 为left结果分配独立temp
+
+            String leftResult = res.newTemp();
             res.add(IrInst.assign(leftResult, left.lastTemp()));
+
             String lblFalse = res.newLabel();
             String lblEnd = res.newLabel();
-            String dest = res.newTemp();
+
             res.add(IrInst.ifz(leftResult, lblFalse));
+
             IrList right = node.right.accept(this);
             res.addAll(right);
-            String rightResult = res.newTemp(); // 为right结果分配独立temp
+
+            String rightResult = res.newTemp();
             res.add(IrInst.assign(rightResult, right.lastTemp()));
+
+            // 注意：dest 必须放在 rightResult 后面 newTemp，
+            // 这样 res.lastTemp() 才会是 dest
+            String dest = res.newTemp();
+
             res.add(IrInst.bin(dest, "AND", leftResult, rightResult));
             res.add(IrInst.ggoto(lblEnd));
+
             res.add(IrInst.label(lblFalse));
             res.add(IrInst.constant(dest, 0));
+
             res.add(IrInst.label(lblEnd));
             return res;
-        } else if (node.op == BinOp.OR) {
+        }
+
+        if (node.op == BinOp.OR) {
             // short-circuit OR
             IrList left = node.left.accept(this);
             res.addAll(left);
-            String leftResult = res.newTemp(); // 为left结果分配独立temp
+
+            String leftResult = res.newTemp();
             res.add(IrInst.assign(leftResult, left.lastTemp()));
+
             String lblTrue = res.newLabel();
             String lblEnd = res.newLabel();
-            String dest = res.newTemp();
+
             res.add(IrInst.ifnz(leftResult, lblTrue));
+
             IrList right = node.right.accept(this);
             res.addAll(right);
-            String rightResult = res.newTemp(); // 为right结果分配独立temp
+
+            String rightResult = res.newTemp();
             res.add(IrInst.assign(rightResult, right.lastTemp()));
+
+            // 注意：dest 必须放在 rightResult 后面 newTemp，
+            // 这样 res.lastTemp() 才会是 dest
+            String dest = res.newTemp();
+
             res.add(IrInst.bin(dest, "OR", leftResult, rightResult));
             res.add(IrInst.ggoto(lblEnd));
+
             res.add(IrInst.label(lblTrue));
             res.add(IrInst.constant(dest, 1));
+
             res.add(IrInst.label(lblEnd));
             return res;
-        } else {
-            IrList left = node.left.accept(this);
-            res.addAll(left);
-            String leftResult = res.newTemp(); // 为left结果分配独立temp
-            res.add(IrInst.assign(leftResult, left.lastTemp()));
-            IrList right = node.right.accept(this);
-            res.addAll(right);
-            String rightResult = res.newTemp(); // 为right结果分配独立temp
-            res.add(IrInst.assign(rightResult, right.lastTemp()));
-            String dest = res.newTemp();
-            res.add(IrInst.bin(dest, node.op.name(), leftResult, rightResult));
-            return res;
         }
+
+        IrList left = node.left.accept(this);
+        res.addAll(left);
+
+        String leftResult = res.newTemp();
+        res.add(IrInst.assign(leftResult, left.lastTemp()));
+
+        IrList right = node.right.accept(this);
+        res.addAll(right);
+
+        String rightResult = res.newTemp();
+        res.add(IrInst.assign(rightResult, right.lastTemp()));
+
+        String dest = res.newTemp();
+        res.add(IrInst.bin(dest, node.op.name(), leftResult, rightResult));
+
+        return res;
     }
 
     @Override
