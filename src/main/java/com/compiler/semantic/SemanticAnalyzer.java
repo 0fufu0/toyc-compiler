@@ -41,6 +41,7 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
     private ValueType currentFunctionReturnType;
     private boolean currentFunctionHasReturn;
     private int loopDepth;
+    private int irSymbolId = 0;
 
     public SemanticAnalyzer() {
         this.symbolTable = new SymbolTable();
@@ -147,7 +148,7 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
         }
 
         boolean isGlobal = currentFunctionReturnType == null;
-        declareConstant(node.name, isGlobal, value);
+        node.symbolRef = declareConstant(node.name, isGlobal, value);
 
         return null;
     }
@@ -162,7 +163,7 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
         }
 
         boolean isGlobal = currentFunctionReturnType == null;
-        declareVariable(node.name, isGlobal);
+        node.symbolRef = declareVariable(node.name, isGlobal);
 
         return null;
     }
@@ -228,6 +229,8 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
         if (symbol.isConst) {
             throw new SemanticError("Cannot assign to const: " + node.name);
         }
+
+        node.symbolRef = symbol;
 
         if (node.value != null) {
             node.value.accept(this);
@@ -347,7 +350,7 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
 
         try {
             for (ParamNode param : node.params) {
-                declareParameter(param.name);
+                param.symbolRef = declareParameter(param.name);
             }
 
             if (node.body != null) {
@@ -373,7 +376,7 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
      */
     @Override
     public Void visitParam(ParamNode node) {
-        declareParameter(node.name);
+        node.symbolRef = declareParameter(node.name);
         return null;
     }
 
@@ -562,25 +565,35 @@ public class SemanticAnalyzer implements AstVisitor<Void> {
     /**
      * 声明普通变量。
      */
-    public void declareVariable(String name, boolean isGlobal) {
+    public Symbol declareVariable(String name, boolean isGlobal) {
         Symbol symbol = Symbol.variable(name, isGlobal);
+        if (!isGlobal) {
+            symbol.irName = "__local_" + (irSymbolId++) + "_" + name;
+        }
         declareSymbol(symbol);
+        return symbol;
     }
 
     /**
      * 声明 const 常量。
      */
-    public void declareConstant(String name, boolean isGlobal, int constValue) {
+    public Symbol declareConstant(String name, boolean isGlobal, int constValue) {
         Symbol symbol = Symbol.constant(name, isGlobal, constValue);
+        if (!isGlobal) {
+            symbol.irName = "__local_" + (irSymbolId++) + "_" + name;
+        }
         declareSymbol(symbol);
+        return symbol;
     }
 
     /**
      * 声明函数参数。
      */
-    public void declareParameter(String name) {
+    public Symbol declareParameter(String name) {
         Symbol symbol = Symbol.parameter(name);
+        symbol.irName = "__param_" + (irSymbolId++) + "_" + name;
         declareSymbol(symbol);
+        return symbol;
     }
 
     /**

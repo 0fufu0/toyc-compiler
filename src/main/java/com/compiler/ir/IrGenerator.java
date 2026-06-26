@@ -1,7 +1,31 @@
 package com.compiler.ir;
 
-import com.compiler.ast.*;
 import java.util.Stack;
+
+import com.compiler.ast.AssignStmtNode;
+import com.compiler.ast.AstNode;
+import com.compiler.ast.AstVisitor;
+import com.compiler.ast.BinOp;
+import com.compiler.ast.BinaryExprNode;
+import com.compiler.ast.BlockStmtNode;
+import com.compiler.ast.BreakStmtNode;
+import com.compiler.ast.CallExprNode;
+import com.compiler.ast.CompUnitNode;
+import com.compiler.ast.ConstDeclNode;
+import com.compiler.ast.ContinueStmtNode;
+import com.compiler.ast.DeclNode;
+import com.compiler.ast.EmptyStmtNode;
+import com.compiler.ast.ExprStmtNode;
+import com.compiler.ast.FuncDefNode;
+import com.compiler.ast.IdNode;
+import com.compiler.ast.IfStmtNode;
+import com.compiler.ast.IntLiteralNode;
+import com.compiler.ast.ParamNode;
+import com.compiler.ast.ReturnStmtNode;
+import com.compiler.ast.StmtNode;
+import com.compiler.ast.UnaryExprNode;
+import com.compiler.ast.VarDeclNode;
+import com.compiler.ast.WhileStmtNode;
 
 /**
  * 将 AST 转换为三地址码的简单生成器实现（模块 C 的基础实现）。
@@ -11,10 +35,17 @@ public class IrGenerator implements AstVisitor<IrList> {
     private final IrList env = new IrList();
 
     /**
-     * 循环标签栈，用于处理 break 和 continue 语句
-     * 每个元素是一个数组，[0] = break目标标签, [1] = continue目标标签
+     * 循环标签栈，用于处理 break 和 continue 语句 每个元素是一个数组，[0] = break目标标签, [1] =
+     * continue目标标签
      */
     private final Stack<String[]> loopLabels = new Stack<>();
+
+    private String irName(com.compiler.semantic.Symbol symbol, String fallback) {
+        if (symbol != null && symbol.irName != null) {
+            return symbol.irName;
+        }
+        return fallback;
+    }
 
     public IrList generate(CompUnitNode unit) {
         IrList r = visitCompUnit(unit);
@@ -43,9 +74,9 @@ public class IrGenerator implements AstVisitor<IrList> {
         res.addAll(initList);
         String resultTemp = initList.lastTemp();
         if (node.init.constValue != null) {
-            res.add(IrInst.constant(node.name, node.init.constValue));
+            res.add(IrInst.constant(irName(node.symbolRef, node.name), node.init.constValue));
         } else if (resultTemp != null) {
-            res.add(IrInst.assign(node.name, resultTemp));
+            res.add(IrInst.assign(irName(node.symbolRef, node.name), resultTemp));
         }
         return res;
     }
@@ -57,9 +88,9 @@ public class IrGenerator implements AstVisitor<IrList> {
         res.addAll(init);
         String resultTemp = init.lastTemp();
         if (node.init.constValue != null) {
-            res.add(IrInst.constant(node.name, node.init.constValue));
+            res.add(IrInst.constant(irName(node.symbolRef, node.name), node.init.constValue));
         } else if (resultTemp != null) {
-            res.add(IrInst.assign(node.name, resultTemp));
+            res.add(IrInst.assign(irName(node.symbolRef, node.name), resultTemp));
         }
         return res;
     }
@@ -94,9 +125,9 @@ public class IrGenerator implements AstVisitor<IrList> {
         res.addAll(val);
         String tmp = val.lastTemp();
         if (node.value.constValue != null) {
-            res.add(IrInst.constant(node.name, node.value.constValue));
+            res.add(IrInst.constant(irName(node.symbolRef, node.name), node.value.constValue));
         } else {
-            res.add(IrInst.assign(node.name, tmp));
+            res.add(IrInst.assign(irName(node.symbolRef, node.name), tmp));
         }
         return res;
     }
@@ -191,8 +222,9 @@ public class IrGenerator implements AstVisitor<IrList> {
         IrList res = new IrList();
         res.add(IrInst.func(node.name));
         // params are handled by semantic layer; just generate body
-        for(int i=0;i<node.params.size();i++){
-            res.add(IrInst.param(node.params.get(i).name));
+        for (int i = 0; i < node.params.size(); i++) {
+            ParamNode p = node.params.get(i);
+            res.add(IrInst.param(irName(p.symbolRef, p.name)));
         }
         res.addAll(node.body.accept(this));
         res.add(IrInst.endFunc());
@@ -293,7 +325,7 @@ public class IrGenerator implements AstVisitor<IrList> {
         }
         String dst = res.newTemp();
         // load variable by name (ASSIGN temp = varName)
-        res.add(IrInst.assign(dst, node.name));
+        res.add(IrInst.assign(dst, irName(node.symbolRef, node.name)));
         return res;
     }
 
@@ -309,9 +341,9 @@ public class IrGenerator implements AstVisitor<IrList> {
     public IrList visitCallExpr(CallExprNode node) {
         IrList res = new IrList();
         // evaluate args
-        for (int i=0;i<node.args.size();i++) {
+        for (int i = 0; i < node.args.size(); i++) {
             res.addAll(node.args.get(i).accept(this));
-            res.add(IrInst.arg("t"+(IrList.getTmpId()-1)));
+            res.add(IrInst.arg("t" + (IrList.getTmpId() - 1)));
         }
         String dst = res.newTemp();
         res.add(IrInst.call(dst, node.funcName));
