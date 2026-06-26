@@ -11,7 +11,12 @@ public class IrList {
 
     private final List<IrInst> insts = new ArrayList<>();
     static private int tmpId = 0;
-    private int labelId = 0;
+    static private int labelId = 0;
+
+    public static void resetCounters() {
+        tmpId = 0;
+        labelId = 0;
+    }
     private final java.util.List<String> temps = new ArrayList<>();
 
     public static int getTmpId() {
@@ -23,31 +28,24 @@ public class IrList {
     }
 
     public void addAll(IrList other) {
-        if (other == null) return;
-        // 重命名 other 中的标签避免冲突
-        java.util.Map<String, String> labelMap = new java.util.HashMap<>();
-        for (IrInst inst : other.insts) {
-            if ("LABEL".equals(inst.op) && inst.dst != null && inst.dst.startsWith("L")) {
-                if (!labelMap.containsKey(inst.dst)) {
-                    String newName = "L" + (this.labelId++);
-                    labelMap.put(inst.dst, newName);
-                }
-            }
+        if (other == null) {
+            return;
         }
-        for (IrInst inst : other.insts) {
-            IrInst renamed = remapLabels(inst, labelMap);
-            insts.add(renamed);
-        }
+
+        insts.addAll(other.insts);
         temps.addAll(other.temps);
-        this.tmpId = Math.max(this.tmpId, other.tmpId);
     }
 
     private static IrInst remapLabels(IrInst inst, java.util.Map<String, String> labelMap) {
-        if (labelMap.isEmpty()) return inst;
+        if (labelMap.isEmpty()) {
+            return inst;
+        }
         String newDst = (inst.dst != null && labelMap.containsKey(inst.dst)) ? labelMap.get(inst.dst) : inst.dst;
         String newA = (inst.a != null && labelMap.containsKey(inst.a)) ? labelMap.get(inst.a) : inst.a;
         String newB = (inst.b != null && labelMap.containsKey(inst.b)) ? labelMap.get(inst.b) : inst.b;
-        if (newDst == inst.dst && newA == inst.a && newB == inst.b) return inst;
+        if (newDst == inst.dst && newA == inst.a && newB == inst.b) {
+            return inst;
+        }
         return new IrInst(inst.op, newDst, newA, newB);
     }
 
@@ -65,7 +63,9 @@ public class IrList {
      * 返回本列表中最后生成的临时变量名，若无则返回 null。
      */
     public String lastTemp() {
-        if (temps.isEmpty()) return null;
+        if (temps.isEmpty()) {
+            return null;
+        }
         return temps.get(temps.size() - 1);
     }
 

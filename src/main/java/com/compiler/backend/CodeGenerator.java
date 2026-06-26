@@ -32,6 +32,7 @@ public class CodeGenerator {
     boolean isGlobal = true;
     int tempRegCounter = 0;
     int paramBase = 0;
+    String currentSection = "";
 
     static class Context {
 
@@ -42,7 +43,11 @@ public class CodeGenerator {
     public String generate(IrList irList) {
 
         out.setLength(0);
+        currentSection = "";
+        globalVars.clear();
+        argList.clear();
         textEmitted = false;
+        dataEmitted = false;
 
         List<IrInst> insts = irList.asList();
 
@@ -83,11 +88,8 @@ public class CodeGenerator {
 
         paramOffset.clear();
         paramBase = 0;
+        switchText();
 
-        if (!textEmitted) {
-            emit(".text");
-            textEmitted = true;
-        }
         emit(".globl " + inst.dst);
         emit(inst.dst + ":");
     }
@@ -170,7 +172,7 @@ public class CodeGenerator {
                     }
                 }
 
-                case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV", "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE", "BIN_EQ", "BIN_NE", "BIN_MOD" -> {
+                case "BIN_ADD", "BIN_SUB", "BIN_MUL", "BIN_DIV", "BIN_LT", "BIN_GT", "BIN_LE", "BIN_GE", "BIN_EQ", "BIN_NE", "BIN_MOD", "BIN_AND", "BIN_OR" -> {
                     alloc(inst.dst);
                 }
 
@@ -199,7 +201,30 @@ public class CodeGenerator {
         allocS0();
 
         int outgoingArgBytes = computeOutgoingArgBytes(insts);
-        stackSize = (-ctx.offset + 15 + paramBase) / 16 * 16;
+        stackSize = (-ctx.offset + outgoingArgBytes + 15) / 16 * 16;
+    }
+
+    int computeOutgoingArgBytes(List<IrInst> insts) {
+        int currentArgCount = 0;
+        int maxArgCount = 0;
+        boolean hasCall = false;
+
+        for (IrInst inst : insts) {
+            if ("ARG".equals(inst.op)) {
+                currentArgCount++;
+            } else if ("CALL".equals(inst.op)) {
+                hasCall = true;
+                maxArgCount = Math.max(maxArgCount, currentArgCount);
+                currentArgCount = 0;
+            }
+        }
+
+        if (!hasCall || maxArgCount == 0) {
+            return 0;
+        }
+
+// genCall 现在从 4(sp) 开始放参数，所以要多预留 4 字节，避免覆盖当前函数自己的局部变量 / ra / s0
+        return maxArgCount * 4 + 4;
     }
 
     int computeOutgoingArgBytes(List<IrInst> insts) {
@@ -272,13 +297,12 @@ public class CodeGenerator {
         }
         if (paramOffset != null && paramOffset.containsKey(var)) {
             //System.out.println("HIT PARAM");
-            emit("lw " + reg + ", " + paramOffset.get(var) + "(s0)");
+            emitLoadFromBase(reg, "s0", paramOffset.get(var));
             return;
         }
 
         if (offsetMap.containsKey(var)) {
-            emit("lw " + reg + ", "
-                    + offsetMap.get(var) + "(s0)");
+            emitLoadFromBase(reg, "s0", offsetMap.get(var));
             return;
         }
 
@@ -297,12 +321,12 @@ public class CodeGenerator {
         }
 
         if (paramOffset.containsKey(var)) {
-            emit("sw " + reg + ", " + paramOffset.get(var) + "(s0)");
+            emitStoreToBase(reg, "s0", paramOffset.get(var));
             return;
         }
 
         if (offsetMap.containsKey(var)) {
-            emit("sw " + reg + ", " + offsetMap.get(var) + "(s0)");
+            emitStoreToBase(reg, "s0", offsetMap.get(var));
             return;
         }
 
@@ -312,15 +336,55 @@ public class CodeGenerator {
         }
     }
 
+    boolean fitsImm12(int x) {
+        return x >= -2048 && x <= 2047;
+    }
+
+    String scratchReg(String avoid) {
+        return "t5".equals(avoid) ? "t4" : "t5";
+    }
+
+    void emitAddImm(String rd, String rs, int imm) {
+        if (fitsImm12(imm)) {
+            emit("addi " + rd + ", " + rs + ", " + imm);
+        } else {
+            String scratch = scratchReg(rd);
+            emit("li " + scratch + ", " + imm);
+            emit("add " + rd + ", " + rs + ", " + scratch);
+        }
+    }
+
+    void emitLoadFromBase(String reg, String base, int offset) {
+        if (fitsImm12(offset)) {
+            emit("lw " + reg + ", " + offset + "(" + base + ")");
+        } else {
+            String scratch = scratchReg(reg);
+            emit("li " + scratch + ", " + offset);
+            emit("add " + scratch + ", " + base + ", " + scratch);
+            emit("lw " + reg + ", 0(" + scratch + ")");
+        }
+    }
+
+    void emitStoreToBase(String reg, String base, int offset) {
+        if (fitsImm12(offset)) {
+            emit("sw " + reg + ", " + offset + "(" + base + ")");
+        } else {
+            String scratch = scratchReg(reg);
+            emit("li " + scratch + ", " + offset);
+            emit("add " + scratch + ", " + base + ", " + scratch);
+            emit("sw " + reg + ", 0(" + scratch + ")");
+        }
+    }
+
     void emitPrologue() {
-        emit("addi sp, sp, -" + stackSize);
-        emit("sw s0, " + (stackSize + s0Offset) + "(sp)");
-        emit("addi s0, sp, " + stackSize);
+        emitAddImm("sp", "sp", -stackSize);
+        emitStoreToBase("s0", "sp", stackSize + s0Offset);
+        emitAddImm("s0", "sp", stackSize);
     }
 
     void emitEpilogue() {
-        emit("lw s0, " + s0Offset + "(s0)");
-        emit("addi sp, sp, " + stackSize);
+        emitLoadFromBase("s0", "s0", s0Offset);
+        emitAddImm("sp", "sp", stackSize);
         emit("ret");
     }
 
@@ -336,10 +400,7 @@ public class CodeGenerator {
 
     void genGlobal(IrInst i) {
 
-        if (!dataEmitted) {
-            emit(".data");
-            dataEmitted = true;
-        }
+        switchData();
 
         emit(i.dst + ":");
         if (i.a != null) {
@@ -463,12 +524,12 @@ public class CodeGenerator {
         for (int k = 0; k < argList.size(); k++) {
             load(argList.get(k), "t0");
             pOffset += 4;
-            emit("sw t0, " + pOffset + "(sp)");
+            emitStoreToBase("t0", "sp", pOffset);
         }
         argList.clear();
-        emit("sw ra, " + raOffset + "(s0)");
+        emitStoreToBase("ra", "s0", raOffset);
         emit("call " + i.a);
-        emit("lw ra, " + raOffset + "(s0)");
+        emitLoadFromBase("ra", "s0", raOffset);
         store("a0", i.dst);
     }
 
@@ -478,12 +539,26 @@ public class CodeGenerator {
             load(i.a, "a0");
         }
 
-        emit("lw s0, " + s0Offset + "(s0)");
-        emit("addi sp, sp, " + stackSize);
+        emitLoadFromBase("s0", "s0", s0Offset);
+        emitAddImm("sp", "sp", stackSize);
         emit("ret");
     }
 
     void emit(String s) {
         out.append(s).append("\n");
+    }
+
+    void switchText() {
+        if (!"text".equals(currentSection)) {
+            emit(".text");
+            currentSection = "text";
+        }
+    }
+
+    void switchData() {
+        if (!"data".equals(currentSection)) {
+            emit(".data");
+            currentSection = "data";
+        }
     }
 }

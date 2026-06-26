@@ -6,13 +6,12 @@ import java.util.List;
 import com.compiler.ast.ValueType;
 
 /**
- * 符号种类。
- * ToyC 里没有 class，所以不保留 CLASS。
+ * 符号种类。 ToyC 里没有 class，所以不保留 CLASS。
  */
 enum SymbolType {
-    VARIABLE,   // 普通变量
-    CONSTANT,   // const 常量
-    FUNCTION,   // 函数
+    VARIABLE, // 普通变量
+    CONSTANT, // const 常量
+    FUNCTION, // 函数
     PARAMETER   // 函数形参
 }
 
@@ -20,6 +19,7 @@ public class Symbol {
 
     public String name;          // 符号名
     public ValueType type;       // 变量/常量/参数：int；函数：返回类型 int/void
+    public String irName;
 
     public SymbolType symbolType;
 
@@ -44,7 +44,7 @@ public class Symbol {
         this.name = name;
         this.symbolType = symbolType;
         this.type = type;
-
+        this.irName = name;
         this.isConst = symbolType == SymbolType.CONSTANT;
         this.isGlobal = false;
         this.constValue = null;
