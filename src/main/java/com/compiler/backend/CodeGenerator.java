@@ -271,14 +271,12 @@ public class CodeGenerator {
             return;
         }
         if (paramOffset != null && paramOffset.containsKey(var)) {
-            //System.out.println("HIT PARAM");
-            emit("lw " + reg + ", " + paramOffset.get(var) + "(s0)");
+            emitLw(reg, paramOffset.get(var), "s0");
             return;
         }
 
         if (offsetMap.containsKey(var)) {
-            emit("lw " + reg + ", "
-                    + offsetMap.get(var) + "(s0)");
+            emitLw(reg, offsetMap.get(var), "s0");
             return;
         }
 
@@ -297,12 +295,12 @@ public class CodeGenerator {
         }
 
         if (paramOffset.containsKey(var)) {
-            emit("sw " + reg + ", " + paramOffset.get(var) + "(s0)");
+            emitSw(reg, paramOffset.get(var), "s0");
             return;
         }
 
         if (offsetMap.containsKey(var)) {
-            emit("sw " + reg + ", " + offsetMap.get(var) + "(s0)");
+            emitSw(reg, offsetMap.get(var), "s0");
             return;
         }
 
@@ -313,14 +311,14 @@ public class CodeGenerator {
     }
 
     void emitPrologue() {
-        emit("addi sp, sp, -" + stackSize);
-        emit("sw s0, " + (stackSize + s0Offset) + "(sp)");
-        emit("addi s0, sp, " + stackSize);
+        emitAddi("sp", "sp", -stackSize);
+        emitSw("s0", stackSize + s0Offset, "sp");
+        emitAddi("s0", "sp", stackSize);
     }
 
     void emitEpilogue() {
-        emit("lw s0, " + s0Offset + "(s0)");
-        emit("addi sp, sp, " + stackSize);
+        emitLw("s0", s0Offset, "s0");
+        emitAddi("sp", "sp", stackSize);
         emit("ret");
     }
 
@@ -459,16 +457,15 @@ public class CodeGenerator {
 
     void genCall(IrInst i) {
         int pOffset = 0;
-        //System.out.println(argList.size());
         for (int k = 0; k < argList.size(); k++) {
             load(argList.get(k), "t0");
             pOffset += 4;
-            emit("sw t0, " + pOffset + "(sp)");
+            emitSw("t0", pOffset, "sp");
         }
         argList.clear();
-        emit("sw ra, " + raOffset + "(s0)");
+        emitSw("ra", raOffset, "s0");
         emit("call " + i.a);
-        emit("lw ra, " + raOffset + "(s0)");
+        emitLw("ra", raOffset, "s0");
         store("a0", i.dst);
     }
 
@@ -478,12 +475,41 @@ public class CodeGenerator {
             load(i.a, "a0");
         }
 
-        emit("lw s0, " + s0Offset + "(s0)");
-        emit("addi sp, sp, " + stackSize);
+        emitLw("s0", s0Offset, "s0");
+        emitAddi("sp", "sp", stackSize);
         emit("ret");
     }
 
     void emit(String s) {
         out.append(s).append("\n");
+    }
+
+    void emitAddi(String lhs, String rhs, int imm) {
+        if (imm >= -2048 && imm <= 2047) {
+            emit("addi " + lhs + ", " + rhs + ", " + imm);
+        } else {
+            emit("li t6, " + imm);
+            emit("add " + lhs + ", " + rhs + ", t6");
+        }
+    }
+
+    void emitLw(String rd, int offset, String base) {
+        if (offset >= -2048 && offset <= 2047) {
+            emit("lw " + rd + ", " + offset + "(" + base + ")");
+        } else {
+            emit("li t6, " + offset);
+            emit("add t6, t6, " + base);
+            emit("lw " + rd + ", 0(t6)");
+        }
+    }
+
+    void emitSw(String rs2, int offset, String base) {
+        if (offset >= -2048 && offset <= 2047) {
+            emit("sw " + rs2 + ", " + offset + "(" + base + ")");
+        } else {
+            emit("li t6, " + offset);
+            emit("add t6, t6, " + base);
+            emit("sw " + rs2 + ", 0(t6)");
+        }
     }
 }
