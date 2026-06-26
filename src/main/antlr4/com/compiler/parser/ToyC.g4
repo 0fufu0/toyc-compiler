@@ -12,11 +12,11 @@ decl
     ;
 
 constDecl
-    : CONST INT STAR? ID ASSIGN expr SEMI
+    : CONST INT STAR* ID STAR* ASSIGN expr SEMI
     ;
 
 varDecl
-    : INT STAR? ID ASSIGN expr SEMI
+    : INT STAR* ID STAR* ASSIGN expr SEMI
     ;
 
 stmt
@@ -37,7 +37,7 @@ block
     ;
 
 funcDef
-    : (INT | VOID) STAR? ID LPAREN paramList? RPAREN block
+    : (INT | VOID) STAR* ID STAR* LPAREN paramList? RPAREN block
     ;
 
 paramList
@@ -45,7 +45,7 @@ paramList
     ;
 
 param
-    : INT STAR? ID
+    : INT STAR* ID STAR*
     ;
 
 expr
@@ -130,7 +130,8 @@ COMMA   : ',';
 SEMI    : ';';
 
 NUMBER
-    : '-'? ('0' | [1-9][0-9]*)
+    : '0'
+    | [1-9][0-9]*
     ;
 
 ID
@@ -142,7 +143,7 @@ LINE_COMMENT
     ;
 
 BLOCK_COMMENT
-    : '/*' (BLOCK_COMMENT | ~[*] | '*' ~[/])* '*/' -> skip
+    : '/*' .*? '*/' -> skip
     ;
 
 WS

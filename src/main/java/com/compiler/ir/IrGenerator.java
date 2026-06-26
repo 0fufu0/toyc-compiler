@@ -385,7 +385,6 @@ public class IrGenerator implements AstVisitor<IrList> {
     @Override
     public IrList visitId(IdNode node) {
         IrList res = new IrList();
-        String scopedName = getScopedName(node.name);
         String dst = res.newTemp();
         // load variable by name (ASSIGN temp = varName)
         res.add(IrInst.assign(dst, irName(node.symbolRef, node.name)));
